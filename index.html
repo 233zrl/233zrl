@@ -656,7 +656,10 @@
     <input onblur="api.key = this.value; localStorage.setItem('apiKey',api.key) ;console.log(api.key);localApiKey()" type="text" class="keyInput" placeholder="在这里输入你的Key">
 
     <a href="https://platform.deepseek.com/api_keys">获取key</a>
-        <button onclick="const system = prompt('输入提示词'); if(system){messages.Spush(system)} ">添加提示词</button>
+
+    <button onclick="messages.messages.pop();messages.messages.pop();renderMessages(messages.messages);alert('（在你<提交>新对话之前，不会本地保存,刷新页面即可，撤回撤回。）')">撤回</button>  
+    
+    <button onclick="const system = prompt('输入提示词'); if(system){messages.Spush(system)} ">添加提示词</button>
 
     <button onclick="(async()=>{if(confirm(`是否清除数据${indexDB}（第${indexDB + 1}条）`)) {await chatArray.update(indexDB,{hintData:{name:messages.hintData.name},...defChatData});initializeChatSystem(indexDB)  }})()">清空聊天</button>
     <button onclick="chatList.attachListUI()">切换聊天</button>
