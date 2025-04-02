@@ -423,6 +423,7 @@
           request.onsuccess = async (event) => {
             this.db = event.target.result;
             await this._syncCache();
+            if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
             resolve();
           };
 
