@@ -692,7 +692,8 @@
     // 初始化markdown解析器（精简版）
     const converter = window.markdownit({
       breaks: true,
-      linkify: true
+      linkify: true,
+      html:true,
     });
   </script>
 
@@ -755,7 +756,8 @@
 
     //一些变量
     //创建一个用来装数组下标，如果没有默认为零的变量
-    let indexDB = 0
+    let indexDB = localStorage.getItem('indexDB')?localStorage.getItem('indexDB'):0
+
     let api = { key: '', }
     //new new new 这里以后的字符串未来都换成变量，为本地存储和修改参数做准备。请注意即使加入以上功能也要先new！
     const messages = new Messages()
@@ -958,6 +960,8 @@
       ul.addEventListener('click', function(e) {
         if (e.target.tagName === 'LI') {
           indexDB = +e.target.dataset.id
+          //存入本地
+          localStorage.setItem('indexDB', +e.target.dataset.id)
           initializeChatSystem(indexDB)
           //判断一下是否为必须选择模式，如果是则删除dialog。
           if (mustSelect) { dialog.remove() }
