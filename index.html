@@ -218,226 +218,244 @@
   
   <script>
     //=========================================
-    //Messages部分 负责操控messages数组。
+//Messages部分 负责操控messages数组。
+
+//俺寻思与ai聊天主要操控这个，那我给他写一个构造函数，应该没问题。
+
+//创建 Messages构造函数，未来用来操控messages数组。
+function Messages() {
+  this.messages = []
+  this.systems = []
+  this.hintData = { name: '', }
+}
+//Messages的Mpush方法，可以推元素进入对话数组
+Messages.prototype.Mpush = function(role, content) {
+  if (!content?.trim()) {
+    throw new Error(`
+        [系统提示异常] 检测到空对话
+    `)
+  }
+  return this.messages.push({ role, content })
+}
+//Messages的Spush方法，可以推元素进入系统提示信息数组
+Messages.prototype.Spush = function(content) {
+  if (!content?.trim()) {
+    throw new Error(`
+        [系统提示异常] 检测到空提示词
+        --------------------------
+        原因: 传入的提示词内容为空或仅包含空格
+        代码: EMPTY_SYSTEM_PROMPT
+        建议操作: 
+          1. 检查调用Spush的位置
+          2. 确认传入参数有效性
+          3. 添加非空校验逻辑
+    `)
+  }
+  //return用于返回push的返回值数组长度，如果后面要接着新代码，可以直接更改为返回数组长度。
+  return this.systems.push({ role: 'system', content })
+}
+//增加一个获得可以被转化为字符串的方法
+Messages.prototype.getMessages = function() {
+  return [
+    ...this.systems,
+    ...this.messages
+  ]
+}
+
+
+//=========================================
+//ChatRequestBuilder 部分 负责构建请求体
+
+//这样就可以通过构造函数构建请求体json了
+
+//参数：模型，对话信息（可以配合构造函数Messages），其他参数
+function ChatRequestBuilder(model, messages, initialConfig = {}) {
+  this.model = model
+  this.messages = messages
+  this.initialConfig = {
+    ...initialConfig
+  }
+}
+ChatRequestBuilder.prototype.toJSON = function() {
+  let jsonData = {
+    model: this.model,
+    ...this.initialConfig
+  }
+  //判断messages是否有getMessages方法
+  // 情况1：是的话调用getMessages方法
+  
+  if (typeof this.messages?.getMessages === 'function') {
+    jsonData.messages = this.messages.getMessages()
+  }
+  // 情况2：如果是普通数组则直接加入
+  else if (Array.isArray(this.messages) && this.messages !== null) {
+    jsonData.messages = this.messages
+  } else {
+    throw new Error('bro,ChatRequestBuilder的第二个参数，你传的什么东西')
+  }
+  return JSON.stringify(jsonData)
+}
+
+
+//=========================================
+//ApiClient 部分 负责通过http请求调用对话api
+
+//参数：apikey
+function ApiClient(apiKey) {
+  this.apiKey = apiKey
+  this.url = 'https://api.deepseek.com/v1/chat/completions'
+}
+
+//参数：请求体json，或对象
+ApiClient.prototype.send = async function(body) {
+  try {
+    //我本来只想判断一下是否为json的，但是热情ai直接把好的处理方式写完了。
+    // 统一处理请求体
+    let requestBody;
     
-    //俺寻思与ai聊天主要操控这个，那我给他写一个构造函数，应该没问题。
-    
-    //创建 Messages构造函数，未来用来操控messages数组。
-    function Messages() {
-      this.messages = []
-      this.systems = []
-      this.hintData = { name: '', }
+    // 情况1：如果传入的是已构建好的请求器实例
+    if (typeof body?.toJSON === 'function') {
+      requestBody = body.toJSON();
     }
-    //Messages的Mpush方法，可以推元素进入对话数组
-    Messages.prototype.Mpush = function(role, content) {
-      this.messages.push({ role, content })
+    // 情况2：如果是普通对象则自动转换
+    else if (typeof body === 'object' && body !== null) {
+      requestBody = JSON.stringify(body);
     }
-    //Messages的Spush方法，可以推元素进入系统提示信息数组
-    Messages.prototype.Spush = function(content) {
-      this.systems.push({ role: 'system', content })
-    }
-    //增加一个获得可以被转化为字符串的方法
-    Messages.prototype.getMessages = function() {
-      return [
-        ...this.systems,
-        ...this.messages
-      ]
-    }
-    
-    
-    //=========================================
-    //ChatRequestBuilder 部分 负责构建请求体
-    
-    //这样就可以通过构造函数构建请求体json了
-    
-    //参数：模型，对话信息（可以配合构造函数Messages），其他参数
-    function ChatRequestBuilder(model, messages, initialConfig = {}) {
-      this.model = model
-      this.messages = messages
-      this.initialConfig = {
-        ...initialConfig
+    // 情况3：如果已经是字符串则验证有效性
+    else if (typeof body === 'string') {
+      try {
+        JSON.parse(body); // 验证是否为合法JSON
+        requestBody = body;
+      } catch {
+        throw new Error('字符串不是有效的JSON格式');
       }
     }
-    ChatRequestBuilder.prototype.toJSON = function() {
-      let jsonData = {
-        model: this.model,
-        ...this.initialConfig
+    // 其他情况报错
+    else {
+      throw new Error('无效的请求体类型，应传入对象或JSON字符串');
+    }
+    //发送http请求
+    const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`
+      },
+      body: requestBody //要求传进来的应该是json字符串
+    })
+    
+    //判断ok
+    if (!res.ok) throw new Error('请求失败')
+    
+    //返回数据
+    return await res
+    
+    //报错
+  } catch (error) {
+    alert('http请求错误' + error)
+    throw error
+  }
+}
+
+//参数：请求体json，或对象
+ApiClient.prototype.strSend = async function(body, fun = () => {}, fun2 = () => {}) {
+  try {
+    //我本来只想判断一下是否为json的，但是热情ai直接把好的处理方式写完了。
+    // 统一处理请求体
+    let requestBody;
+    
+    // 情况1：如果传入的是已构建好的请求器实例
+    if (typeof body?.toJSON === 'function') {
+      requestBody = body.toJSON();
+    }
+    // 情况2：如果是普通对象则自动转换
+    else if (typeof body === 'object' && body !== null) {
+      requestBody = JSON.stringify(body);
+    }
+    // 情况3：如果已经是字符串则验证有效性
+    else if (typeof body === 'string') {
+      try {
+        JSON.parse(body); // 验证是否为合法JSON
+        requestBody = body;
+      } catch {
+        throw new Error('字符串不是有效的JSON格式');
       }
-      //判断messages是否有getMessages方法
-      // 情况1：是的话调用getMessages方法
+    }
+    // 其他情况报错
+    else {
+      throw new Error('无效的请求体类型，应传入对象或JSON字符串');
+    }
+    //发送http请求
+    const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`
+      },
+      body: requestBody //要求传进来的应该是json字符串
+    })
+    
+    //判断ok
+    if (!res.ok) throw new Error('请求失败')
+    
+    //流式返回数据
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let text = ''
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        // 处理最后可能残留的数据
+        if (buffer.trim().length > 0) {
+          processChunk(buffer);
+        }
+        break;
+      }
       
-      if (typeof this.messages?.getMessages === 'function') {
-        jsonData.messages = this.messages.getMessages()
-      }
-      // 情况2：如果是普通数组则直接加入
-      else if (Array.isArray(this.messages) && this.messages !== null) {
-        jsonData.messages = this.messages
-      } else {
-        throw new Error('bro,ChatRequestBuilder的第二个参数，你传的什么东西')
-      }
-      return JSON.stringify(jsonData)
-    }
-    
-    
-    //=========================================
-    //ApiClient 部分 负责通过http请求调用对话api
-    
-    //参数：apikey
-    function ApiClient(apiKey) {
-      this.apiKey = apiKey
-      this.url = 'https://api.deepseek.com/v1/chat/completions'
-    }
-    
-    //参数：请求体json，或对象
-    ApiClient.prototype.send = async function(body) {
-      try {
-        //我本来只想判断一下是否为json的，但是热情ai直接把好的处理方式写完了。
-        // 统一处理请求体
-        let requestBody;
+      buffer += decoder.decode(value, { stream: true }); // 注意使用 stream: true
+      
+      // 使用更灵活的分隔符正则表达式
+      const chunks = buffer.split(/(\r?\n){2}/);
+      buffer = chunks.pop() || '';
+      
+      //
+      chunks.forEach(rawChunk => {
+        const cleanChunk = rawChunk.trim().replace(/^data: /, '');
+        //总不能是空的吧
+        if (!cleanChunk) return
+        //如果结束了就结束
+        if (cleanChunk === '[DONE]') {
+          fun2(text)
+          return
+        }
         
-        // 情况1：如果传入的是已构建好的请求器实例
-        if (typeof body?.toJSON === 'function') {
-          requestBody = body.toJSON();
-        }
-        // 情况2：如果是普通对象则自动转换
-        else if (typeof body === 'object' && body !== null) {
-          requestBody = JSON.stringify(body);
-        }
-        // 情况3：如果已经是字符串则验证有效性
-        else if (typeof body === 'string') {
-          try {
-            JSON.parse(body); // 验证是否为合法JSON
-            requestBody = body;
-          } catch {
-            throw new Error('字符串不是有效的JSON格式');
+        try {
+          const obj = JSON.parse(cleanChunk);
+          //console.log('原始块:', rawChunk); // 调试日志
+          //console.log('解析对象:', obj);    // 调试日志
+          
+          if (obj.choices?.[0]?.delta?.content) {
+            //console.log(obj.choices[0].delta.content);
+            // 在这里处理实际内容
+            text += obj.choices[0].delta.content
+            //console.log(text)
           }
+        } catch (e) {
+          console.error('解析失败:', e.message, '原始数据:', cleanChunk);
         }
-        // 其他情况报错
-        else {
-          throw new Error('无效的请求体类型，应传入对象或JSON字符串');
-        }
-        //发送http请求
-        const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-          },
-          body: requestBody //要求传进来的应该是json字符串
-        })
-        
-        //判断ok
-        if (!res.ok) throw new Error('请求失败')
-        
-        //返回数据
-        return await res
-        
-        //报错
-      } catch (error) {
-        alert('http请求错误')
-        throw error
-      }
+      });
+      
+      //回调函数,持续更新。
+      fun(text)
     }
     
-    //参数：请求体json，或对象
-    ApiClient.prototype.strSend = async function(body, fun = () => {}, fun2 = () => {}) {
-      try {
-        //我本来只想判断一下是否为json的，但是热情ai直接把好的处理方式写完了。
-        // 统一处理请求体
-        let requestBody;
-        
-        // 情况1：如果传入的是已构建好的请求器实例
-        if (typeof body?.toJSON === 'function') {
-          requestBody = body.toJSON();
-        }
-        // 情况2：如果是普通对象则自动转换
-        else if (typeof body === 'object' && body !== null) {
-          requestBody = JSON.stringify(body);
-        }
-        // 情况3：如果已经是字符串则验证有效性
-        else if (typeof body === 'string') {
-          try {
-            JSON.parse(body); // 验证是否为合法JSON
-            requestBody = body;
-          } catch {
-            throw new Error('字符串不是有效的JSON格式');
-          }
-        }
-        // 其他情况报错
-        else {
-          throw new Error('无效的请求体类型，应传入对象或JSON字符串');
-        }
-        //发送http请求
-        const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.apiKey}`
-          },
-          body: requestBody //要求传进来的应该是json字符串
-        })
-        
-        //判断ok
-        if (!res.ok) throw new Error('请求失败')
-        
-        //流式返回数据
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        let text = ''
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            // 处理最后可能残留的数据
-            if (buffer.trim().length > 0) {
-              processChunk(buffer);
-            }
-            break;
-          }
-          
-          buffer += decoder.decode(value, { stream: true }); // 注意使用 stream: true
-          
-          // 使用更灵活的分隔符正则表达式
-          const chunks = buffer.split(/(\r?\n){2}/);
-          buffer = chunks.pop() || '';
-          
-          //
-          chunks.forEach(rawChunk => {
-            const cleanChunk = rawChunk.trim().replace(/^data: /, '');
-            //总不能是空的吧
-            if (!cleanChunk) return
-            //如果结束了就结束
-            if (cleanChunk === '[DONE]') {
-              fun2(text)
-              return
-            }
-            
-            try {
-              const obj = JSON.parse(cleanChunk);
-              //console.log('原始块:', rawChunk); // 调试日志
-              //console.log('解析对象:', obj);    // 调试日志
-              
-              if (obj.choices?.[0]?.delta?.content) {
-                //console.log(obj.choices[0].delta.content);
-                // 在这里处理实际内容
-                text += obj.choices[0].delta.content
-                //console.log(text)
-              }
-            } catch (e) {
-              console.error('解析失败:', e.message, '原始数据:', cleanChunk);
-            }
-          });
-          
-          //回调函数,持续更新。
-          fun(text)
-        }
-        
-        //报错
-      } catch (error) {
-        alert('http请求错误')
-        throw error
-      }
-    }
+    //报错
+  } catch (error) {
+    alert('http请求错误' + error)
+    throw error
+  }
+}
   </script>
   
   <script>
@@ -938,7 +956,8 @@
         console.log('初始数据加载完成');
         // 5. 渲染聊天
         renderMessages(messages.messages)
-        
+            localApiKey()
+
         
       } catch (error) {
         console.error('初始化失败:', error);
@@ -1051,7 +1070,7 @@
         sendMessage()
       }
     })
-    //搜图功能，你要是有能研究明白可以自己用。
+    //搜图功能，你要是有能研究明白可以自己用
     // 配置你的API Key（直接使用，不需要用户ID）
     const API_KEY = ""; // 替换为你的Key
     const LOGIN = ""; // 替换为你的用户名
