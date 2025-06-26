@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pianren AIChat</title>
+  <link rel="stylesheet" href="./css/style.css" type="text/css" media="all" />
+  <link rel="stylesheet" href="./css/custom-dialog.css">
+</head>
+
+<body>
+  <div class="title">Pianren AIChat</div>
+  <nav class="nav">
+    <div class="setBtn navBtn iconfont" data-action="settings">
+      &#xe677;
+      <ul class="setBtnList">
+        <li><button data-action="add-prompt">添加提示词</button></li>
+        <li><button data-action="clear-chat">清空该聊天</button></li>
+        <li><button data-action="delete-chat">删除该聊天</button></li>
+        <li><button data-action="set-ApiKey">设置Api Key</button></li>
+      </ul>
+    </div>
+    <button class="toggleBtn navBtn" data-action="switch-chat">聊天管理</button>
+
+    <!--<button class="dlData">下载聊天</button>-->
+  </nav>
+  <div>
+    (不推荐使用夸克浏览器，会删聊天记录、无法长按唤出菜单、会把输入框卡在天上)
+  </div>
+
+  <!--显示-->
+  <ul class="list">
+    <!-- <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">111</li>
+    <li class="user">1111111111111111111111</li>
+    <li class="user">111</li>
+    <li class="user">111</li> -->
+  </ul>
+  <!-- 底边栏 -->
+  <div class="inputArea">
+    <!-- 小按钮行 -->
+    <div class="toolbar flex">
+      <button class="left">不知道</button>
+      <button class="add-chat" data-action="add-chat">新建对话</button>
+      <button class="to-bottom iconfont" data-action="to-bottom">&#xe688;</button>
+    </div>
+
+    <!--输入行-->
+    <div class="inputBox">
+      <textarea type="text" class="input" placeholder="点击输入，鸿运当头666。使用 Ctrl + Enter 快捷发送。"></textarea>
+      <!-- <input> -->
+    </div>
+
+    <!-- 快捷按钮行 -->
+    <div class="quick-reply-box">
+      <!-- <button class="quick-reply">&oplus;</button> -->
+      <button class="submit iconfont">&#xe67b;</button>
+
+      <!-- 快捷输入列表 -->
+      <div class="quick-reply-list-box" style="display: none;">
+        <ul class="quick-reply-list">
+          <li class="quick-reply-item">回复1</li>
+          <li class="quick-reply-item">回复2</li>
+          <li class="quick-reply-item">回复3</li>
+        </ul>
+      </div>
+    </div>
+
+
+    <!-- 上下文菜单 -->
+    <dialog class="ContextMenu">
+      <ul>
+        <li data-action="undo">撤回</li>
+        <li data-action="copy">复制</li>
+        <li data-action="edit">编辑</li>
+      </ul>
+    </dialog>
+
+
+    <script src="https://gcore.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+    <script src="./js/chatService.js"></script>
+    <script src="./js/LocalArrayDB.js"></script>
+    <!-- <script src="./js/listDB.js"></script> -->
+    <script src="./js/UIController.js"></script>
+    <script src="./js/main.js"></script>
+
+    <!-- 测试 -->
+    <script src="./tests/Test.js"></script>
+</body>
+
+</html>
