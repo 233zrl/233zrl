@@ -7,7 +7,6 @@ class ChatApp {
     this.chatsDB = new LocalArrayDB('chats')
 
     //可配置选项
-
     this.useStream = true // 默认开启流式
     this.useLocalStorage = true // 默认开启LocalArrayDB本地存储
     this.currentChatIndex = localStorage.getItem('currentChatIndex') || 0 // 当前聊天索引
@@ -35,6 +34,12 @@ class ChatApp {
   }
   //初始化
   async init() {
+    // 检查是否有API Key
+    if (!this.api.apiKey) {
+      this.ui.showError('请先设置API Key')
+      return
+    }
+
     //本地数据初始化
     if (this._checkLocalStorage()) await this.initDB()
     //回到底部
@@ -474,10 +479,8 @@ class ChatApp {
       // 调用新增聊天方法
       this.addNewChat(name, defaultSystems)
     }
-    this.addNewChat() // 调用新增聊天方法
     this.ui.showInputDialog({ title: '输入聊天名称', placeholder: '聊天名称', value: '', onConfirm })
   }
-
 
 
   // 检查生成中
