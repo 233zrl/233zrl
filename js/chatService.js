@@ -7,7 +7,13 @@
 function Messages() {
   this.messages = []
   this.systems = []
-  this.hintData = { name: '', }
+  this.hintData = {
+    name: '',
+    toolState: {
+      currentTime: '同步失败', // 当前时间
+      currentTime_TS: 0, // 当前时间戳
+    }
+  }
 }
 //Messages的Mpush方法，可以推元素进入对话数组
 Messages.prototype.Mpush = function (role, content) {
@@ -19,7 +25,7 @@ Messages.prototype.Mpush = function (role, content) {
   return this.messages.push({ role, content })
 }
 //Messages的Spush方法，可以推元素进入系统提示信息数组
-Messages.prototype.Spush = function (content,) {
+Messages.prototype.Spush = function (content, open = true) {
   if (!content?.trim()) {
     throw new Error(`
         [系统提示异常] 检测到空提示词
@@ -33,7 +39,7 @@ Messages.prototype.Spush = function (content,) {
     `)
   }
   //return用于返回push的返回值数组长度，如果后面要接着新代码，可以直接更改为返回数组长度。
-  return this.systems.push({ role: 'system', content })
+  return this.systems.push({ role: 'system', content, open })
 }
 //messages数组的撤回方法，撤回到指定索引之上的assistant消息
 Messages.prototype.Mundo = function (index) {
@@ -84,23 +90,90 @@ Messages.prototype.setName = function (name) {
   }
   this.hintData.name = name
 }
-//增加一个获取所有消息的方法(包括系统提示和用户消息)
-Messages.prototype.getMessages = function (rounds) {
-  // 如果未传参数或参数无效，返回全部
-  if (rounds === undefined || rounds === null || rounds === 0 || isNaN(rounds)) {
-    return [
-      ...this.systems,
-      ...this.messages
-    ]
+//切换systems数组中指定索引的系统提示的开启状态
+Messages.prototype.toggleSystemOpen = function (index) {
+  if (index < 0 || index >= this.systems.length) {
+    throw new Error(`
+        [系统提示异常] 检测到无效的系统提示索引
+    `)
   }
-  // 否则只返回最后N轮（假设一轮是用户+AI各一条）
+  // 切换开关状态
+  console.log(`切换系统提示 ${index} 的开启状态`)
+  if (this.systems[index].open === undefined) {
+    this.systems[index].open = true // 默认开启
+  }
+  this.systems[index].open = !this.systems[index].open
+  console.log(`系统提示 ${index} 的开启状态已切换为 ${this.systems[index].open}`)
+}
+//设置系统提示的content内容
+Messages.prototype.setSystemContent = function (index, content) {
+  if (index < 0 || index >= this.systems.length) {
+    throw new Error(`
+        [系统提示异常] 检测到无效的系统提示索引
+    `)
+  }
+  if (!content?.trim()) {
+    throw new Error(`
+        [系统提示异常] 检测到空系统提示内容
+    `)
+  }
+  this.systems[index].content = content
+}
+// 删除指定索引的系统提示
+Messages.prototype.deleteSystem = function (index) {
+  // 检查索引有效性
+  if (index < 0 || index >= this.systems.length) {
+    throw new Error(`
+        [系统提示异常] 检测到无效的系统提示索引
+    `)
+  }
+  // 删除指定索引的系统提示
+  this.systems.splice(index, 1)
+}
+// 获取开启的系统提示
+Messages.prototype.getOpenSystems = function () {
+  return this.systems.filter(item => item?.open !== false)
+}
+
+// 获取 hintData 生成的系统提示对象
+Messages.prototype.getHintSystem = function () {
+
+  const { currentTime, currentTime_TS } = Utils.updateCurrentTime(this.hintData?.toolState) // 自动更新时间
+  return {
+    role: 'system',
+    content: `
+    你的名字是：${this.hintData.name || '未知'}，现实时间：${currentTime}，时间戳：${currentTime_TS}
+    `,
+    open: true
+  }
+}
+
+// 获取最近 N 轮消息（每轮2条，用户+AI），rounds为0或无效时返回全部
+Messages.prototype.getRecentMessages = function (rounds) {
+  if (rounds === undefined || rounds === null || rounds === 0 || isNaN(rounds)) {
+    return this.messages
+  }
   const total = this.messages.length
   const n = Math.max(0, total - rounds * 2)
+  return this.messages.slice(n)
+}
+
+// 获取所有消息（系统提示+hint+用户消息）
+Messages.prototype.getMessages = function (rounds) {
+  // 先获取开启的系统提示
+  const systems = this.getOpenSystems()
+  // 加入 hintData
+  systems.unshift(this.getHintSystem())
+  // 获取消息片段
+  const messages = this.getRecentMessages(rounds)
+  // 合并返回
   return [
-    ...this.systems,
-    ...this.messages.slice(n)
+    ...systems,
+    ...messages
   ]
 }
+
+
 
 
 //=========================================

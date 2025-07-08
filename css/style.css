@@ -45,6 +45,13 @@ button {
   color: white;
 }
 
+.absulute-to-right {
+  position: absolute;
+  right: 0;
+  top: 0;
+
+}
+
 /* 底边栏 */
 
 .inputArea {
@@ -110,16 +117,18 @@ button {
 
 .inputBox {
   display: flex;
+  position: sticky;
   /* height: 30px;*/
   margin: 5px 0;
   border: #42445A solid 1.5px;
   border-radius: 5px;
   /* box-shadow: 0px 3px 8px 1px #00000099; */
+  bottom: 0;
 }
 
 .inputBox .input {
   min-height: 32px;
-  max-height: 5em;
+  max-height: 7em;
   height: 32px;
   padding: calc(16px - 1em / 2) 0 0 10px;
   flex: 1;
@@ -139,6 +148,7 @@ button {
 }
 
 .quick-reply-box {
+  position: relative;
   display: flex;
   align-items: center;
   height: 32px;
@@ -157,7 +167,7 @@ button {
   flex: 1;
   overflow-y: scroll;
   overflow-x: hidden;
-  margin: 0 5px;
+  margin: 20px 5px 5px 5px;
 }
 
 .list>li {
@@ -174,7 +184,7 @@ button {
   transition: all .5s;
 }
 
-.list>li *:not(pre):not(code):not(div) {
+.list>li *:not(pre):not(code):not(div):not(a):not(img) {
   pointer-events: none;
 }
 
@@ -260,10 +270,12 @@ button {
 .nav {
   /* padding: 10px 5px; */
   /* overflow-x: scroll; */
+  position: sticky;
   background-color: #42445A;
   color: white;
   white-space: nowrap;
-
+  top: 0;
+  z-index: 1;
 }
 
 .nav button {
@@ -296,7 +308,7 @@ button {
   transition: all .3s;
   opacity: 0;
   border-radius: 0 0 10px 0;
-  z-index: 1;
+  z-index: 2;
 }
 
 .nav .setBtn:hover {

@@ -9,6 +9,7 @@ class UIController {
     this.submit = document.querySelector('.inputArea .submit')
     this.contextMenu = document.querySelector('.ContextMenu')
     this.toolbar = document.querySelector('.toolbar') // 工具栏小按钮行
+    
     // 消息列表缓存
     this.messageList = []
 
@@ -56,7 +57,9 @@ class UIController {
       const action = button.dataset.action
 
       const actionMap = {
+
         "add-prompt": () => this.onAddPrompt?.(),
+        "set-prompt": () => this.onSetPrompt?.(),
         "clear-chat": () => this.onClearChat?.(),
         "delete-chat": () => this.onDeleteChat?.(),
         "set-ApiKey": () => this.onSetApiKey?.(),
@@ -217,7 +220,7 @@ class UIController {
     this.dialog.show({
       title,
       content: [
-        { type: 'text', name: 'input', placeholder, value, required: true, autofocus: true }
+        { type: 'textarea', name: 'input', placeholder, value, required: true, autofocus: true }
       ],
       buttons: [
         { text: '取消', type: 'default', onClick: () => { this.dialog.close(); onCancel?.() } },
@@ -291,6 +294,81 @@ class UIController {
         }
       ]
     });
+  }
+  // 显示提示词列表管理弹窗
+  showSystemListDialog(systemList, { onEdit, onToggle, onDelete, onAdd }) {
+    const items = systemList.map((item, index) => {
+      return {
+        id: index,
+        content: item.content,
+        open: item?.open !== false ? '开启' : '关闭' // open不存在时默认为true item?.open 不存在时为undefined 存在时 为true 或 false 所以用 !== false 
+      }
+    })
+
+    console.log('items:', items)
+
+    const config = {
+      title: '提示词列表',
+      list: {
+        items: items,
+        searchable: true,
+        renderItem: (item) => {
+          const div = document.createElement('div')
+          div.className = 'list-item-content'
+          div.innerHTML = `
+        <strong style="line-height:1.2;height: calc(1em * 1.2);overflow:hidden;">${item.content}</strong>
+        <span class="status">${item.open}</span>
+      `
+          return div
+        },
+      },
+      //编辑，开关，删除，取消。
+      buttons: [
+        {
+          text: '编辑',
+          type: 'default',
+          actionType: 'item-action',
+          onClick: (item, index) => {
+            //调用编辑方法
+            onEdit?.(item.id)
+          }
+        },
+        {
+          text: '开/关',
+          type: 'default',
+          actionType: 'item-action',
+          onClick: (item, index) => {
+            //调用开关方法
+            onToggle?.(item.id)
+          }
+        },
+        {
+          text: '删除',
+          type: 'danger',
+          actionType: 'item-action',
+          onClick: (item, index) => {
+            //调用删除方法
+            onDelete?.(item.id)
+          }
+        },
+        {
+          text: '添加',
+          type: 'default',
+          // actionType: 'item-action',
+          onClick: (item, index) => {
+            //调用添加方法
+            onAdd?.()
+          }
+        },
+        {
+          text: '取消',
+          type: 'default',
+          onClick: () => this.dialog.close()
+        }
+      ]
+    }
+
+    this.dialog.show(config)
   }
 
   // 制造一条消息并根据参数加入到消息列表
