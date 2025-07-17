@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pianren AIChat</title>
+  <link rel="icon" href="./icon/icon.png" type="image/x-icon">
   <link rel="stylesheet" href="./css/style.css" type="text/css" media="all" />
   <link rel="stylesheet" href="./css/custom-dialog.css">
 </head>
@@ -19,8 +20,10 @@
         <li><button data-action="set-prompt">管理提示词</button></li>
         <li><button data-action="clear-chat">清空该聊天</button></li>
         <li><button data-action="delete-chat">删除该聊天</button></li>
+        <li><button data-action="edit-config">编辑可配置项</button></li>
         <li><button data-action="set-ApiKey">设置Api Key</button></li>
       </ul>
+      <div class="overlay"></div>
     </div>
     <button class="toggleBtn navBtn" data-action="switch-chat">管理聊天</button>
 
@@ -93,18 +96,22 @@
   <dialog class="ContextMenu">
     <ul>
       <li data-action="undo">撤回</li>
-      <li data-action="copy">复制</li>
       <li data-action="edit">编辑</li>
+      <li data-action="copy">选择复制</li>
+      <li data-action="copy-all">全文复制</li>
     </ul>
   </dialog>
 
   <script src="https://gcore.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+  <script src="./js/config.js"></script>
   <script src="./js/Utils.js"></script>
   <script src="./js/chatService.js"></script>
   <script src="./js/LocalArrayDB.js"></script>
   <!-- <script src="./js/listDB.js"></script> -->
   <script src="./js/UIController.js"></script>
+  <script src="./js/ConfigManager.js"></script>
   <script src="./js/main.js"></script>
+
 
   <!-- 测试 -->
   <script src="./tests/Test.js"></script>
