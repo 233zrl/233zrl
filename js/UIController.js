@@ -9,7 +9,7 @@ class UIController {
     this.submit = document.querySelector('.inputArea .submit')
     this.contextMenu = document.querySelector('.ContextMenu')
     this.toolbar = document.querySelector('.toolbar') // 工具栏小按钮行
-    
+
     // 消息列表缓存
     this.messageList = []
 
@@ -62,6 +62,7 @@ class UIController {
         "set-prompt": () => this.onSetPrompt?.(),
         "clear-chat": () => this.onClearChat?.(),
         "delete-chat": () => this.onDeleteChat?.(),
+        "edit-config": () => this.onEditConfig?.(),
         "set-ApiKey": () => this.onSetApiKey?.(),
       }
 
@@ -151,7 +152,8 @@ class UIController {
     const actionMap = {
       'undo': () => this.onUndo?.(this.selectedMessageId),
       'copy': () => this.onCopy?.(this.selectedMessageId),
-      'edit': () => this.onEdit?.(this.selectedMessageId)
+      'edit': () => this.onEdit?.(this.selectedMessageId),
+      'copy-all': () => this.onCopyAll?.(this.selectedMessageId),
     }
     // 执行操作
     actionMap[action]?.()
@@ -370,6 +372,29 @@ class UIController {
 
     this.dialog.show(config)
   }
+  // 显示Toast消息
+  showToast(message, duration = 2000) {
+    // 创建或复用Toast元素
+    if (!this.toastElement) {
+      this.toastElement = document.createElement('div');
+      this.toastElement.className = 'toast-message';
+      Object.assign(this.toastElement.style, {
+        opacity: '0',
+        transition: 'opacity 0.3s'
+      });
+      document.body.appendChild(this.toastElement);
+    }
+
+    // 显示Toast
+    this.toastElement.textContent = message;
+    this.toastElement.style.opacity = '1';
+
+    // 自动隐藏
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => {
+      this.toastElement.style.opacity = '0';
+    }, duration);
+  }
 
   // 制造一条消息并根据参数加入到消息列表
   _createMessageItem(item, index) {
@@ -584,14 +609,14 @@ class DialogManager {
     }
   }
 
-  getFormData() {
-    if (!this.currentDialog) return null;
-    const form = this.currentDialog.querySelector('form');
-    if (!form) return null;
+  // getFormData() {
+  //   if (!this.currentDialog) return null;
+  //   const form = this.currentDialog.querySelector('form');
+  //   if (!form) return null;
 
-    const formData = new FormData(form);
-    return Object.fromEntries(formData.entries());
-  }
+  //   const formData = new FormData(form);
+  //   return Object.fromEntries(formData.entries());
+  // }
 
   getSelectedItem() {
     return this.selectedItem;
@@ -695,5 +720,120 @@ class DialogManager {
         config.onCancel?.();
       }
     });
+  }
+  _createInput(field) {
+    let input;
+    switch (field.type) {
+      case 'textarea':
+        input = document.createElement('textarea');
+        input.rows = field.rows || 4;
+        break;
+      case 'select':
+        input = document.createElement('select');
+        field.options?.forEach(opt => {
+          const option = document.createElement('option');
+          option.value = opt.value;
+          option.textContent = opt.label;
+          input.appendChild(option);
+        });
+        break;
+      case 'number':
+        input = document.createElement('input');
+        input.type = 'number';
+        if (field.min !== undefined) input.min = field.min;
+        if (field.max !== undefined) input.max = field.max;
+        if (field.step !== undefined) input.step = field.step;
+        break;
+      case 'checkbox':
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = Boolean(field.value);
+        break;
+      case 'switch':
+        input = this._createSwitch(field);
+        break;
+      default:
+        input = document.createElement('input');
+        input.type = field.type || 'text';
+    }
+
+    // 设置通用属性
+    input.name = field.name || '';
+
+    // 对于非布尔类型设置值
+    if (field.type !== 'checkbox' && field.type !== 'switch') {
+      input.value = field.value || '';
+      input.placeholder = field.placeholder || '';
+    }
+
+    if (field.required) input.required = true;
+    if (field.autofocus) input.autofocus = true;
+
+    return input;
+  }
+
+  // 创建开关元素（修复版）
+  _createSwitch(field) {
+    const container = document.createElement('label');
+    container.className = 'switch-container';
+
+    // 创建隐藏的复选框（用于状态管理）
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = Boolean(field.value);
+    input.name = field.name || '';
+    input.className = 'switch-input';
+
+    // 创建滑块
+    const slider = document.createElement('span');
+    slider.className = 'switch-slider';
+
+    // 创建标签文本
+    // const labelText = document.createElement('span');
+    // labelText.className = 'switch-label';
+    // labelText.textContent = field.label || '';
+
+    // 组装结构
+    container.appendChild(input);
+    container.appendChild(slider);
+    // container.appendChild(labelText);
+
+    return container;
+  }
+
+  // 修改后的 getFormData 方法，支持类型转换
+  getFormData() {
+    if (!this.currentDialog) return null;
+    const form = this.currentDialog.querySelector('form');
+    if (!form) return null;
+
+    const formData = new FormData(form);
+    const result = {};
+
+    for (const [name, value] of formData.entries()) {
+      // 获取字段元素以确定类型
+      const element = form.querySelector(`[name="${name}"]`);
+      if (!element) continue;
+
+      // 根据字段类型进行转换
+      switch (element.type) {
+        case 'number':
+          result[name] = parseFloat(value);
+          break;
+        case 'checkbox':
+          result[name] = element.checked;
+          break;
+        default:
+          // 检查是否在开关容器内
+          const switchInput = element.closest('.switch-container')?.querySelector('input');
+          if (switchInput && switchInput.name === name) {
+            result[name] = switchInput.checked;
+          } else {
+            result[name] = value;
+          }
+      }
+    }
+
+    return result;
   }
 }

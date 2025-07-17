@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pianren AIChat</title>
+  <link rel="icon" href="./icon/icon.png" type="image/x-icon">
   <link rel="stylesheet" href="./css/style.css" type="text/css" media="all" />
   <link rel="stylesheet" href="./css/custom-dialog.css">
 </head>
@@ -16,19 +17,24 @@
       &#xe677;
       <ul class="setBtnList">
         <li><button data-action="add-prompt">添加提示词</button></li>
+        <li><button data-action="set-prompt">管理提示词</button></li>
         <li><button data-action="clear-chat">清空该聊天</button></li>
         <li><button data-action="delete-chat">删除该聊天</button></li>
+        <li><button data-action="edit-config">编辑可配置项</button></li>
         <li><button data-action="set-ApiKey">设置Api Key</button></li>
       </ul>
+      <div class="overlay"></div>
     </div>
-    <button class="toggleBtn navBtn" data-action="switch-chat">聊天管理</button>
+    <button class="toggleBtn navBtn" data-action="switch-chat">管理聊天</button>
 
     <!--<button class="dlData">下载聊天</button>-->
+    <div
+      style="font-size: 10px; position: absolute; bottom: calc(-2em * 1.5); background-color: rgba(255, 255, 255, 0);color: black;">
+      (推荐谷歌、via、edge浏览器，禁止使用夸克浏览器，会出问题。) <br>
+      设置deepseek的Api Key，点击右上角设置按钮，选择“设置Api Key”<br>
+    </div>
   </nav>
-  <div>
-    (推荐谷歌、via、edge浏览器) <br>
-    使用之前先设置deepseek的Api Key，点击右上角设置按钮，选择“设置Api Key”<br>
-  </div>
+
 
   <!--显示-->
   <ul class="list">
@@ -62,45 +68,53 @@
 
     <!--输入行-->
     <div class="inputBox">
-      <textarea type="text" class="input" placeholder="点击输入，鸿运当头666。使用 Ctrl + Enter 快捷发送。"></textarea>
+      <textarea type="text" class="input" placeholder="点击输入，使用 Ctrl + Enter 快捷发送。"></textarea>
       <!-- <input> -->
     </div>
 
     <!-- 快捷按钮行 -->
     <div class="quick-reply-box">
-      <!-- <button class="quick-reply">&oplus;</button> -->
-      <button class="submit iconfont">&#xe67b;</button>
-
-      <!-- 快捷输入列表 -->
-      <div class="quick-reply-list-box" style="display: none;">
-        <ul class="quick-reply-list">
-          <li class="quick-reply-item">回复1</li>
-          <li class="quick-reply-item">回复2</li>
-          <li class="quick-reply-item">回复3</li>
-        </ul>
+      <div class="absulute-to-right">
+        <button class="quick-reply iconfont">&#xe633;</button>
+        <button class="submit iconfont">&#xe67b;</button>
       </div>
+
+
     </div>
-
-
-    <!-- 上下文菜单 -->
-    <dialog class="ContextMenu">
-      <ul>
-        <li data-action="undo">撤回</li>
-        <li data-action="copy">复制</li>
-        <li data-action="edit">编辑</li>
+    <!-- 快捷输入列表 -->
+    <div class="quick-reply-list-box" style="display: none;">
+      <ul class="quick-reply-list">
+        <li class="quick-reply-item">回复1</li>
+        <li class="quick-reply-item">回复2</li>
+        <li class="quick-reply-item">回复3</li>
       </ul>
-    </dialog>
+    </div>
+  </div>
 
 
-    <script src="https://gcore.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
-    <script src="./js/chatService.js"></script>
-    <script src="./js/LocalArrayDB.js"></script>
-    <!-- <script src="./js/listDB.js"></script> -->
-    <script src="./js/UIController.js"></script>
-    <script src="./js/main.js"></script>
+  <!-- 上下文菜单 -->
+  <dialog class="ContextMenu">
+    <ul>
+      <li data-action="undo">撤回</li>
+      <li data-action="edit">编辑</li>
+      <li data-action="copy">选择复制</li>
+      <li data-action="copy-all">全文复制</li>
+    </ul>
+  </dialog>
 
-    <!-- 测试 -->
-    <script src="./tests/Test.js"></script>
+  <script src="https://gcore.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+  <script src="./js/config.js"></script>
+  <script src="./js/Utils.js"></script>
+  <script src="./js/chatService.js"></script>
+  <script src="./js/LocalArrayDB.js"></script>
+  <!-- <script src="./js/listDB.js"></script> -->
+  <script src="./js/UIController.js"></script>
+  <script src="./js/ConfigManager.js"></script>
+  <script src="./js/main.js"></script>
+
+
+  <!-- 测试 -->
+  <script src="./tests/Test.js"></script>
 </body>
 
 </html>

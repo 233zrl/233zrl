@@ -266,3 +266,90 @@ button.dialog-btn.danger:hover {
 .list-items::-webkit-scrollbar-thumb:hover {
   background: #6A6D85;
 }
+
+/* 数字输入框样式 */
+input[type="number"] {
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* 开关控件 - 统一样式 */
+.switch-container {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.switch-slider {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+  background-color: #5A5D7A;
+  border-radius: 12px;
+  transition: background-color 0.3s;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  top: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+/* 隐藏原生复选框 */
+.switch-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* 选中状态样式 */
+.switch-input:checked+.switch-slider {
+  background-color: #E9C000;
+}
+
+.switch-input:checked+.switch-slider:before {
+  transform: translateX(26px);
+}
+
+.switch-label {
+  margin-left: 8px;
+  font-size: 14px;
+  color: #F0F0F0;
+  order: -1;
+  /* 将标签移到左侧 */
+}
+
+/* 移除复选框样式 */
+input[type="checkbox"] {
+  display: none;
+  /* 隐藏原生复选框 */
+}
+
+.toast-message {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 20px;
+  border-radius: 4px;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}

@@ -301,14 +301,15 @@ button {
 
 .nav .setBtn .setBtnList {
   background-color: #42445A;
-  position: absolute;
-  margin-top: 6px;
+  position: absolute; 
+  /* margin-top: 6px; */
   font-size: 14px;
   visibility: hidden;
-  transition: all .3s;
   opacity: 0;
   border-radius: 0 0 10px 0;
   z-index: 2;
+  transform: translateX(-100%);
+  transition: all .3s;
 }
 
 .nav .setBtn:hover {
@@ -317,6 +318,7 @@ button {
 
 .nav .setBtn:hover .setBtnList {
   visibility: visible;
+  transform: translateX(0);
   opacity: 1;
 }
 

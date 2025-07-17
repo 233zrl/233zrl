@@ -138,11 +138,11 @@ Messages.prototype.getOpenSystems = function () {
 // 获取 hintData 生成的系统提示对象
 Messages.prototype.getHintSystem = function () {
 
-  const { currentTime, currentTime_TS } = Utils.updateCurrentTime(this.hintData?.toolState) // 自动更新时间
+  const { currentTime } = Utils.updateCurrentTime(this.hintData?.toolState) // 自动更新时间
   return {
     role: 'system',
     content: `
-    你的名字是：${this.hintData.name || '未知'}，现实时间：${currentTime}，时间戳：${currentTime_TS}
+    你的名字是：${this.hintData.name || '未知'}，现实实时 时间：${currentTime}，时间戳：废弃
     `,
     open: true
   }
