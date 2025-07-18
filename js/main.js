@@ -115,6 +115,8 @@ class ChatApp {
       }
       // 刷新 UI
       this.ui.renderMessageList(this.messages.messages)
+      // 更新显示的Name
+      this.ui.setNavChatName(this.messages.hintData.name || '未命名会话')
       // 没什么用，但是异步函数需要它
       return this.messages
     } catch (e) {
@@ -195,6 +197,8 @@ class ChatApp {
         this.messages.setName(newTitle)
         // 刷新 UI
         this.ui.renderMessageList(this.messages.messages)
+        // 更新显示的name
+        this.ui.setNavChatName(newTitle)
 
         // 保存到本地存储
         if (this._checkLocalStorage()) {
@@ -451,22 +455,16 @@ class ChatApp {
           if (chats.length === 0) {
             // 如果全部删除了，自动新建一个聊天
             await this.addNewChat('未命名会话', this.DEFAULT_SYSTEMS);
-          } else {
-            // 如果当前删除的是当前聊天，优先切换到第一个
-            if (index === this.currentChatIndex) {
-              this.currentChatIndex = 0;
-              localStorage.setItem('currentChatIndex', 0);
-              await this.loadChatByIndex(0);
-            } else if (this.currentChatIndex > chats.length - 1) {
-              // 当前索引大于剩余聊天数，切换到最后一个
-              this.currentChatIndex = chats.length - 1;
-              localStorage.setItem('currentChatIndex', this.currentChatIndex);
-              await this.loadChatByIndex(this.currentChatIndex);
-            } else {
-              // 否则保持当前
-              await this.loadChatByIndex(this.currentChatIndex);
-            }
+            // 切换到新建的聊天
+            await this.loadChatByIndex(0);
+          } else if (index === this.currentChatIndex) {
+            // 当前索引等于当前页码，切换到前一个
+            this.currentChatIndex = Math.max(0, this.currentChatIndex - 1)
+            localStorage.setItem('currentChatIndex', this.currentChatIndex)
+            await this.loadChatByIndex(this.currentChatIndex)
+
           }
+
         } catch (e) {
           console.error('删除聊天记录失败:', e);
           this.ui.showError(e.message || '删除聊天记录失败');
@@ -503,17 +501,11 @@ class ChatApp {
           { text: '保存', type: 'primary', submit: true }
         ],
         onSubmit: (formData) => {
+          console.log(formData)
           // 声明一下
           const { useStream, useLocalStorage, maxRounds } = formData
           // 更新配置
           this.updateConfig(formData)
-          // 保存到本地存储
-          this.updateConfig({
-            useStream: formData.useStream,
-            useLocalStorage: formData.useLocalStorage,
-            maxRounds: formData.maxRounds,
-
-          })
           // 关闭弹窗
           this.ui.dialog.close()
         }

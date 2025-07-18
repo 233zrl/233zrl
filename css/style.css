@@ -52,14 +52,18 @@ button {
 
 }
 
-/* 底边栏 */
+/* 底边栏
+*-------------------------------------------------------------------------------------
+*-------------------------------------------------------------------------------------
+*/
 
 .inputArea {
   /* height: 13vh; */
   background-color: #42445A;
   color: white;
-  position: relative;
+  position: sticky;
   padding: 5px 5px;
+  bottom: 0;
 }
 
 .inputArea .submit {
@@ -161,7 +165,11 @@ button {
   margin-left: auto;
 }
 
-/* 聊天列表 */
+/* 聊天列表 
+*-------------------------------------------------------------------------------------
+*-------------------------------------------------------------------------------------
+*-------------------------------------------------------------------------------------
+*/
 
 .list {
   flex: 1;
@@ -265,17 +273,23 @@ button {
   }
 }
 
-/* 导航栏 */
+/* 导航栏 
+*-------------------------------------------------------------------------------------
+*-------------------------------------------------------------------------------------
+*-------------------------------------------------------------------------------------
+*/
 
 .nav {
-  /* padding: 10px 5px; */
-  /* overflow-x: scroll; */
   position: sticky;
   background-color: #42445A;
   color: white;
   white-space: nowrap;
   top: 0;
   z-index: 1;
+  height: 2.5em;
+  display: block;
+  position: relative;
+  /* 关键：为绝对定位子元素提供参照 */
 }
 
 .nav button {
@@ -295,13 +309,15 @@ button {
 }
 
 .nav .setBtn {
-  position: relative;
-  float: left;
+  position: absolute;
+  left: 0;
+  top: 0;
+  user-select: none;
 }
 
 .nav .setBtn .setBtnList {
   background-color: #42445A;
-  position: absolute; 
+  position: absolute;
   /* margin-top: 6px; */
   font-size: 14px;
   visibility: hidden;
@@ -330,11 +346,29 @@ button {
   background-color: #00000020;
 }
 
-.toggleBtn {
-  float: right;
+.nav .navChatName {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
 }
 
-/* 上下文菜单 */
+.toggleBtn {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+/* 上下文菜单 
+*-------------------------------------------------------------------------------------
+*-------------------------------------------------------------------------------------
+*-------------------------------------------------------------------------------------
+*/
 .ContextMenu {
   position: absolute;
   margin: auto;

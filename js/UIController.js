@@ -4,6 +4,7 @@ class UIController {
     this.dialog = new DialogManager()
     // DOM 元素
     this.nav = document.querySelector('.nav')
+    this.navChatName = this.nav.querySelector('.navChatName') //聊天的Name显示区域
     this.chatList = document.querySelector('.list')
     this.input = document.querySelector('.inputBox .input')
     this.submit = document.querySelector('.inputArea .submit')
@@ -452,6 +453,11 @@ class UIController {
     }
   }
 
+  //设置页面中的navChatName
+  setNavChatName(name) {
+    this.navChatName.innerHTML = name
+  }
+
 }
 
 
@@ -807,32 +813,25 @@ class DialogManager {
     const form = this.currentDialog.querySelector('form');
     if (!form) return null;
 
-    const formData = new FormData(form);
     const result = {};
+    // 遍历所有带 name 的表单元素
+    form.querySelectorAll('[name]').forEach(element => {
+      const name = element.name;
+      if (!name) return;
 
-    for (const [name, value] of formData.entries()) {
-      // 获取字段元素以确定类型
-      const element = form.querySelector(`[name="${name}"]`);
-      if (!element) continue;
-
-      // 根据字段类型进行转换
-      switch (element.type) {
-        case 'number':
-          result[name] = parseFloat(value);
-          break;
-        case 'checkbox':
-          result[name] = element.checked;
-          break;
-        default:
-          // 检查是否在开关容器内
-          const switchInput = element.closest('.switch-container')?.querySelector('input');
-          if (switchInput && switchInput.name === name) {
-            result[name] = switchInput.checked;
-          } else {
-            result[name] = value;
-          }
+      // switch/checkbox
+      if (element.type === 'checkbox') {
+        result[name] = element.checked;
       }
-    }
+      // number
+      else if (element.type === 'number') {
+        result[name] = element.value === '' ? '' : parseFloat(element.value);
+      }
+      // 其它类型
+      else {
+        result[name] = element.value;
+      }
+    });
 
     return result;
   }
