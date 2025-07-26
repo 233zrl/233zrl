@@ -214,9 +214,9 @@ ChatRequestBuilder.prototype.toJSON = function () {
 //ApiClient 部分 负责通过http请求调用对话api
 
 //参数：apikey
-function ApiClient(apiKey) {
+function ApiClient(apiKey,apiUrl = 'https://api.deepseek.com/v1/chat/completions') {
   this.apiKey = apiKey
-  this.url = 'https://api.deepseek.com/v1/chat/completions'
+  this.url = apiUrl
   this.isGenerating = false
   this.abortController = null
 }

@@ -11,11 +11,13 @@ class ChatApp {
     this.useLocalStorage = this.configManager.get('useLocalStorage')
     this.maxRounds = this.configManager.get('maxRounds')
     this.DEFAULT_SYSTEMS = this.configManager.get('DEFAULT_SYSTEMS')
+    this.API_URL_CHAT = this.configManager.get('API_URL_CHAT')
+    this.MODEL_NAME_CHAT = this.configManager.get('MODEL_NAME_CHAT')
 
 
     // 其它初始化...
     this.ui = new UIController()
-    this.api = new ApiClient(localStorage.getItem('apiKey'))
+    this.api = new ApiClient(localStorage.getItem('apiKey'), this.API_URL_CHAT)
     this.messages = new Messages()
     this.chatsDB = new LocalArrayDB('chats')
     this.currentChatIndex = localStorage.getItem('currentChatIndex') || 0
@@ -368,16 +370,16 @@ class ChatApp {
 
     // 构建请求体，动态决定是否流式
     const requestBody = new ChatRequestBuilder(
-      'deepseek-chat',
+      this.MODEL_NAME_CHAT,
       this.messages.getMessages(this.maxRounds),
       { stream: isStream, temperature: 0.5, top_P: 0.95 })
+
 
     if (isStream) {
       this.sendStreamRequest(requestBody)
     } else {
       this.sendNormalRequest(requestBody)
     }
-
   }
   // 添加系统提示
   addSystemPrompt(showSystemList) {
@@ -487,6 +489,8 @@ class ChatApp {
       { type: 'switch', name: 'useStream', label: '开启流式回复', value: currentConfig.useStream },
       { type: 'switch', name: 'useLocalStorage', label: '开启本地存储', value: currentConfig.useLocalStorage },
       { type: 'number', name: 'maxRounds', label: '最大对话轮数', value: currentConfig.maxRounds },
+      { type: 'text', name: 'API_URL_CHAT', label: '对话API请求地址', value: currentConfig.API_URL_CHAT },
+      { type: 'text', name: 'MODEL_NAME_CHAT', label: '对话模型名称', value: currentConfig.MODEL_NAME_CHAT },
       // { type: 'textarea', name: 'DEFAULT_SYSTEMS', label: '默认系统提示词',value: , rows: 5 }
     ]
     //

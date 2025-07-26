@@ -15,15 +15,19 @@
   <nav class="nav">
     <div class="setBtn navBtn iconfont" data-action="settings">
       &#xe677;
-      <ul class="setBtnList">
-        <li><button data-action="add-prompt">添加提示词</button></li>
-        <li><button data-action="set-prompt">管理提示词</button></li>
-        <li><button data-action="clear-chat">清空该聊天</button></li>
-        <li><button data-action="delete-chat">删除该聊天</button></li>
-        <li><button data-action="edit-config">编辑可配置项</button></li>
-        <li><button data-action="set-ApiKey">设置Api Key</button></li>
-        <li><button onclick="app.ui.dialog.show({content:'没做，有事进QQ群联系 435761592'})">关于我们</button></li>
-      </ul>
+      <div class="navSidebar">
+        <ul class="setBtnList">
+          <li><button data-action="add-prompt">添加提示词</button></li>
+          <li><button data-action="set-prompt">管理提示词</button></li>
+          <li><button data-action="clear-chat">清空该聊天</button></li>
+          <li><button data-action="delete-chat">删除该聊天</button></li>
+          <li><button data-action="edit-config">编辑可配置项</button></li>
+          <li><button data-action="set-ApiKey">设置Api Key</button></li>
+        </ul>
+        <ul class="setBtnList">
+          <li><button onclick="app.ui.dialog.show({content:'没做，有事进QQ群联系 435761592'})">关于我们</button></li>
+        </ul>
+      </div>
       <div class="overlay"></div>
     </div>
     <span class="navChatName"></span>
@@ -31,9 +35,9 @@
 
     <!--<button class="dlData">下载聊天</button>-->
     <div
-      style="font-size: 10px; position: absolute; bottom: calc(-2em * 1.5); background-color: rgba(255, 255, 255, 0);color: black;">
+      style="font-size: 10px; position: absolute; bottom: calc(-2em * 1.5); background-color: rgba(255, 255, 255, 0);color: rgb(200, 0, 0);">
       (推荐谷歌、via、edge浏览器，禁止使用夸克浏览器，会出问题。) <br>
-      设置deepseek的Api Key，点击右上角设置按钮，选择“设置Api Key”<br>
+      设置deepseek的Api Key，点击左上角设置按钮，选择“设置Api Key”<br>
     </div>
   </nav>
 

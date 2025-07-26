@@ -32,7 +32,8 @@ body {
   background-size: cover;
 }
 
-ul {
+ul,
+dl {
   list-style: none
 }
 
@@ -315,11 +316,17 @@ button {
   user-select: none;
 }
 
-.nav .setBtn .setBtnList {
-  background-color: #42445A;
+/*侧边栏*/
+.navSidebar {
+  width: 50vw;
+  max-width: 250px;
+  max-height: 80vh;
+  padding: 5px;
   position: absolute;
-  /* margin-top: 6px; */
+  background-color: #42445A;
   font-size: 14px;
+  text-align: left;
+  line-height: 2;
   visibility: hidden;
   opacity: 0;
   border-radius: 0 0 10px 0;
@@ -328,22 +335,39 @@ button {
   transition: all .3s;
 }
 
-.nav .setBtn:hover {
-  background-color: #00000020;
-}
-
-.nav .setBtn:hover .setBtnList {
+.nav .setBtn:hover .navSidebar {
   visibility: visible;
   transform: translateX(0);
   opacity: 1;
 }
 
-.nav .setBtn .setBtnList li {
-  padding: 5px;
+.nav .setBtn .setBtnList {
+  background-color: #343546;
+  margin-bottom: 5px;
+  border-top: 1px solid black;
+  border-bottom: 1px solid black;
+
 }
 
-.nav .setBtn .setBtnList li:hover {
+.nav .setBtn:hover {
   background-color: #00000020;
+}
+
+
+.nav .setBtn .setBtnList li,
+.nav .setBtn .setBtnList dd {
+  padding: 3px 5px;
+
+}
+
+.nav .setBtn .setBtnList li:hover,
+.nav .setBtn .setBtnList dd:hover {
+  background-color: #00000020;
+}
+
+.nav .setBtn .setBtnList button {
+  width: 100%;
+  text-align: left;
 }
 
 .nav .navChatName {
