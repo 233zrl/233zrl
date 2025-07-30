@@ -305,9 +305,10 @@ class ChatApp {
     let reply = ''
     try {
       const res = await this.api.send(requestBody)
-      reply = res.choices?.[0]?.message?.content || '无回复'
-      this.messages.Mpush('assistant', reply)
-      this.ui.renderNewMessage({ role: 'assistant', content: reply })
+      const { role, content, reasoning_content } = res.choices?.[0]?.message
+      reply = content || '无回复'
+      this.messages.Mpush({ role: 'assistant', content: reply, reasoning_content })
+      this.ui.renderNewMessage({ role: 'assistant', content: reply, reasoning_content })
       //本地存储
       if (this._checkLocalStorage()) this.saveChatByIndex()
     } catch (e) {
@@ -331,18 +332,23 @@ class ChatApp {
     try {
       await this.api.strSend(
         requestBody,
-        (text) => {
+        (message) => {
+          const { content, reasoning_content } = message
           // 只更新最后一条 assistant 消息
-          this.ui.createOrUpdateMessage({ role: 'assistant', content: text }, tempIndex)
-          lastText = text
+          this.ui.createOrUpdateMessage({ role: 'assistant', content, reasoning_content }, tempIndex)
+          lastText = content
         },
-        (finalText) => {
+        (message) => {
+          const { content, reasoning_content } = message
           // 最终只入库一次，并全量刷新
-          this.messages.Mpush('assistant', finalText)
+          this.messages.Mpush({ role: 'assistant', content, reasoning_content })
           this.ui.renderMessageList(this.messages.messages)
 
           //本地存储
           if (this._checkLocalStorage()) this.saveChatByIndex()
+
+          //打印一下看看
+          console.log('流式请求完成:', content, '\n\n', reasoning_content)
         }
       )
     } catch (e) {
@@ -487,8 +493,8 @@ class ChatApp {
 
     const content = [
       { type: 'switch', name: 'useStream', label: '开启流式回复', value: currentConfig.useStream },
-      { type: 'switch', name: 'useLocalStorage', label: '开启本地存储', value: currentConfig.useLocalStorage },
-      { type: 'number', name: 'maxRounds', label: '最大对话轮数', value: currentConfig.maxRounds },
+      { type: 'switch', name: 'useLocalStorage', label: '开启本地存储(不建议关)', value: currentConfig.useLocalStorage },
+      { type: 'number', name: 'maxRounds', label: '最大对话轮数(0当无限)', value: currentConfig.maxRounds },
       { type: 'text', name: 'API_URL_CHAT', label: '对话API请求地址', value: currentConfig.API_URL_CHAT },
       { type: 'text', name: 'MODEL_NAME_CHAT', label: '对话模型名称', value: currentConfig.MODEL_NAME_CHAT },
       // { type: 'textarea', name: 'DEFAULT_SYSTEMS', label: '默认系统提示词',value: , rows: 5 }

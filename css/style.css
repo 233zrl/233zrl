@@ -71,7 +71,7 @@ button {
   height: 100%;
   aspect-ratio: 1/1;
   margin-left: auto;
-  padding: 5px;
+  padding: 9px;
   background-color: #eddfa4;
   color: white;
   border: 0;
@@ -193,8 +193,13 @@ button {
   transition: all .5s;
 }
 
-.list>li *:not(pre):not(code):not(div):not(a):not(img) {
+.list>li * {
   pointer-events: none;
+}
+
+.list>li>div a,
+.list>li>div img {
+  pointer-events: auto;
 }
 
 .list>li:active {
@@ -266,6 +271,12 @@ button {
   margin-right: 0;
   background: #F5F5F5EE;
   color: black;
+}
+
+.list .cot-block {
+  font-size: 13px;
+  background-color: rgba(0, 0, 0, 0.459);
+  border: black 1px solid;
 }
 
 @keyframes blink {

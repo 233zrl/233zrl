@@ -15,14 +15,27 @@ function Messages() {
     }
   }
 }
-//Messages的Mpush方法，可以推元素进入对话数组
-Messages.prototype.Mpush = function (role, content) {
+//Messages的Mpush方法，可以推元素进入对话数组,兼容直接传入对象作为参数
+//Messages的Mpush方法，可以推元素进入对话数组,兼容直接传入对象作为参数
+Messages.prototype.Mpush = function (role, content, reasoning_content) {
+  // 支持直接传对象
+  if (typeof role === 'object' && role !== null) {
+    const { role: r, content: c, reasoning_content: rc } = role
+    if (!c?.trim()) {
+      throw new Error(`
+        [系统提示异常] 检测到空对话
+      `)
+    }
+    return this.messages.push({ role: r, content: c, reasoning_content: rc })
+  }
+
   if (!content?.trim()) {
     throw new Error(`
         [系统提示异常] 检测到空对话
     `)
   }
-  return this.messages.push({ role, content })
+  // 支持传递reasoning_content
+  return this.messages.push({ role, content, reasoning_content })
 }
 //Messages的Spush方法，可以推元素进入系统提示信息数组
 Messages.prototype.Spush = function (content, open = true) {
@@ -150,12 +163,23 @@ Messages.prototype.getHintSystem = function () {
 
 // 获取最近 N 轮消息（每轮2条，用户+AI），rounds为0或无效时返回全部
 Messages.prototype.getRecentMessages = function (rounds) {
+  //先格式化
+  const messages = this.messages.map((item) => {
+    //确保发送的消息格式正确
+    const { role, content } = item
+    return {
+      role,
+      content
+    }
+  })
+
   if (rounds === undefined || rounds === null || rounds === 0 || isNaN(rounds)) {
-    return this.messages
+    return messages
   }
   const total = this.messages.length
   const n = Math.max(0, total - rounds * 2)
-  return this.messages.slice(n)
+
+  return messages.slice(n)
 }
 
 // 获取所有消息（系统提示+hint+用户消息）
@@ -214,7 +238,7 @@ ChatRequestBuilder.prototype.toJSON = function () {
 //ApiClient 部分 负责通过http请求调用对话api
 
 //参数：apikey
-function ApiClient(apiKey,apiUrl = 'https://api.deepseek.com/v1/chat/completions') {
+function ApiClient(apiKey, apiUrl = 'https://api.deepseek.com/v1/chat/completions') {
   this.apiKey = apiKey
   this.url = apiUrl
   this.isGenerating = false
@@ -278,44 +302,54 @@ ApiClient.prototype.strSend = async function (body, onProgress = () => { }, onDo
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
-    let text = ''
+    const message = {
+      content: '',
+      reasoning_content: '',
+    }
     let interrupted = false
 
+    // 主循环，逐步读取流数据
     while (true) {
       const { done, value } = await reader.read()
-      if (done) {
-        if (buffer.trim().length > 0) {
-          // 处理最后残留数据
-          // 你可以自定义 processChunk(buffer) 或直接处理
-        }
-        break
-      }
+      if (done) break
+
       buffer += decoder.decode(value, { stream: true })
-      const chunks = buffer.split(/(\r?\n){2}/)
-      buffer = chunks.pop() || ''
-      chunks.forEach(rawChunk => {
+
+      // 拆分为多段，每段处理
+      let lines = buffer.split(/(\r?\n){2,}/)
+      buffer = lines.pop() || '' // 剩余未处理部分留到下次
+
+      for (let rawChunk of lines) {
         const cleanChunk = rawChunk.trim().replace(/^data: /, '')
-        if (!cleanChunk) return
+        if (!cleanChunk) continue
         if (cleanChunk === '[DONE]') {
-          onDone(text)
+          onDone({ ...message })
           return
         }
         try {
           const obj = JSON.parse(cleanChunk)
+          // 累加主内容
           if (obj.choices?.[0]?.delta?.content) {
-            text += obj.choices[0].delta.content
+            message.content += obj.choices[0].delta.content
+          }
+          // 累加思维链内容
+          if (obj.choices?.[0]?.delta?.reasoning_content) {
+            message.reasoning_content += obj.choices[0].delta.reasoning_content
           }
         } catch (e) {
           // 忽略解析错误
         }
-      })
-      onProgress(text)
+      }
+
+      onProgress({ ...message })
+
       // 检查是否被中断
       if (!this.isGenerating) {
         interrupted = true
         break
       }
     }
+
     if (interrupted) throw new Error('请求被中断')
   } catch (error) {
     if (error.name === 'AbortError') {

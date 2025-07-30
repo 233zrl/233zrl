@@ -399,19 +399,71 @@ class UIController {
 
   // 制造一条消息并根据参数加入到消息列表
   _createMessageItem(item, index) {
-    //创建li元素
-    const li = document.createElement('li')
-    li.dataset.id = index
-    li.classList.add(item.role)
-    //创建div元素
-    const div = document.createElement('div')
-    div.innerHTML = this.md.render(item.content)
-    //添加到li元素
-    li.appendChild(div)
-    //添加到消息列表缓存
-    this.messageList[index] = li
-    //返回li元素
-    return li
+    const li = document.createElement('li');
+    li.dataset.id = index;
+    li.classList.add(item.role);
+    this.messageList[index] = li;
+
+    // 渲染思维链 如果有思维链，创建或更新
+    if (item.reasoning_content) {
+      this._createOrUpdateCotElement(item.reasoning_content, index);
+    }
+    // 渲染内容
+    const div = document.createElement('div');
+    div.innerHTML = this.md.render(item.content);
+    li.appendChild(div);
+
+
+    return li;
+  }
+  // 刷新单条消息
+  refreshMessage(index, message) {
+    const li = this.messageList[index];
+    if (li) {
+      const div = li.querySelector('div');
+      if (div) {
+        div.innerHTML = this.md.render(message.content);
+      }
+      // 如果有思维链，创建或更新
+      if (message.reasoning_content) {
+        this._createOrUpdateCotElement(message.reasoning_content, index);
+      }
+    }
+  }
+
+  // 1. 创建思维链元素
+  _createCotElement(cotStr) {
+    const cotDiv = document.createElement('div');
+    cotDiv.className = 'cot-block';
+    cotDiv.innerHTML = `<div class="cot-title">思维链-未完成</div>
+    <div class="cot-content">${cotStr}</div>`;
+    return cotDiv;
+  }
+
+  // 2. 修改指定消息的思维链内容
+  _updateCotElement(index, cotStr) {
+    const li = this.messageList[index];
+    if (!li) return;
+    const cotDiv = li.querySelector('.cot-block .cot-content');
+    if (cotDiv) {
+      cotDiv.textContent = cotStr;
+    }
+  }
+
+  // 3. 创建或更新思维链（如果有则更新，否则创建）
+  _createOrUpdateCotElement(cotStr, index) {
+    const li = this.messageList[index];
+    if (!li) return;
+    let cotBlock = li.querySelector('.cot-block');
+    if (cotBlock) {
+      // 已有则更新
+      const cotContent = cotBlock.querySelector('.cot-content');
+      if (cotContent) cotContent.textContent = cotStr;
+    } else {
+      // 没有则创建
+      const cotDiv = this._createCotElement(cotStr);
+      li.appendChild(cotDiv);
+    }
   }
 
   // 如果未来要限制消息列表的长度，可以通过修改传参来实现，因为这样做其他方法不需要改动
@@ -441,16 +493,6 @@ class UIController {
     //创建并添加
     const li = this._createMessageItem(message, this.messageList.length)
     this.chatList.appendChild(li)
-  }
-  // 刷新单条消息
-  refreshMessage(index, message) {
-    const li = this.messageList[index]
-    if (li) {
-      const div = li.querySelector('div')
-      if (div) {
-        div.innerHTML = this.md.render(message.content)
-      }
-    }
   }
 
   //设置页面中的navChatName
@@ -666,7 +708,7 @@ class DialogManager {
 
     input.name = field.name || '';
     input.placeholder = field.placeholder || '';
-    input.value = field.value || '';
+    input.value = field.value !== undefined && field.value !== null ? field.value : '';
     if (field.required) input.required = true;
     if (field.autofocus) input.autofocus = true;
 
@@ -749,6 +791,7 @@ class DialogManager {
         if (field.min !== undefined) input.min = field.min;
         if (field.max !== undefined) input.max = field.max;
         if (field.step !== undefined) input.step = field.step;
+        input.value = field.value !== undefined ? field.value : ''; // 显式设置默认值
         break;
       case 'checkbox':
         input = document.createElement('input');
@@ -768,7 +811,7 @@ class DialogManager {
 
     // 对于非布尔类型设置值
     if (field.type !== 'checkbox' && field.type !== 'switch') {
-      input.value = field.value || '';
+      input.value = field.value !== undefined && field.value !== null ? field.value : '';
       input.placeholder = field.placeholder || '';
     }
 
