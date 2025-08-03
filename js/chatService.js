@@ -252,6 +252,13 @@ ApiClient.prototype.setApiKey = function (apiKey) {
   }
   this.apiKey = apiKey
 }
+//设置APIUrl方法
+ApiClient.prototype.setApiUrl = function (apiUrl) {
+  if (!apiUrl || typeof apiUrl !== 'string') {
+    throw new Error('无效的API URL')
+  }
+  this.url = apiUrl
+}
 
 //参数：请求体json，或对象
 // 普通请求（支持中断和状态管理）

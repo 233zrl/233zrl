@@ -14,4 +14,6 @@ window.defaultConfig = {
   API_URL_CHAT: 'https://api.deepseek.com/v1/chat/completions',
   // 对话模型名称
   MODEL_NAME_CHAT: 'deepseek-chat',
+  // apiKey
+  API_KEY: '',
 }

@@ -404,49 +404,73 @@ class UIController {
     li.classList.add(item.role);
     this.messageList[index] = li;
 
-    // 渲染思维链 如果有思维链，创建或更新
-    if (item.reasoning_content) {
-      this._createOrUpdateCotElement(item.reasoning_content, index);
+
+    // 提前划分思维链区域（无样式）
+    let cotDiv = li.querySelector('.cot-placeholder');
+    if (!cotDiv) {
+      cotDiv = document.createElement('div');
+      cotDiv.className = 'cot-placeholder'; // 仅作占位，无样式
+      li.appendChild(cotDiv);
     }
     // 渲染内容
     const div = document.createElement('div');
+    div.className = 'message-content';
     div.innerHTML = this.md.render(item.content);
     li.appendChild(div);
 
+    // 如果有思维链，调用_createCotElement/_updateCotElement
+    if (item.reasoning_content) {
+      if (item.reasoning_content) {
+        this._createCotElement(item.reasoning_content, index);
+      } else {
+        // 没内容时清空占位
+        cotDiv.innerHTML = '';
+      }
+    }
 
     return li;
   }
   // 刷新单条消息
   refreshMessage(index, message) {
     const li = this.messageList[index];
+    // 如果有思维链，创建或更新
+    if (message.reasoning_content) {
+      this._createOrUpdateCotElement(message.reasoning_content, index);
+    }
+    // 更新内容
     if (li) {
-      const div = li.querySelector('div');
+      const div = li.querySelector('.message-content');
       if (div) {
         div.innerHTML = this.md.render(message.content);
-      }
-      // 如果有思维链，创建或更新
-      if (message.reasoning_content) {
-        this._createOrUpdateCotElement(message.reasoning_content, index);
       }
     }
   }
 
-  // 1. 创建思维链元素
-  _createCotElement(cotStr) {
-    const cotDiv = document.createElement('div');
-    cotDiv.className = 'cot-block';
-    cotDiv.innerHTML = `<div class="cot-title">思维链-未完成</div>
-    <div class="cot-content">${cotStr}</div>`;
-    return cotDiv;
+  // 1.创建思维链元素（有样式），插入到占位区，并返回节点
+  _createCotElement(cotStr, index) {
+    const li = this.messageList[index];
+    if (!li) return null;
+    let cotDiv = li.querySelector('.cot-placeholder');
+    if (!cotDiv) return null;
+    // 创建有样式的内容
+    const cotBlock = document.createElement('div');
+    cotBlock.className = 'cot-block';
+    cotBlock.innerHTML = `
+    <div class="cot-title">思维链</div>
+    <div class="cot-content">${cotStr}</div>
+  `;
+    cotDiv.innerHTML = ''; // 清空占位
+    cotDiv.appendChild(cotBlock);
+    return cotBlock;
   }
 
-  // 2. 修改指定消息的思维链内容
+  // 2.修改指定消息的思维链内容
   _updateCotElement(index, cotStr) {
     const li = this.messageList[index];
     if (!li) return;
-    const cotDiv = li.querySelector('.cot-block .cot-content');
-    if (cotDiv) {
-      cotDiv.textContent = cotStr;
+    const cotContent = li.querySelector('.cot-block .cot-content');
+    if (cotContent) {
+      cotContent.textContent = cotStr;
     }
   }
 
@@ -454,15 +478,16 @@ class UIController {
   _createOrUpdateCotElement(cotStr, index) {
     const li = this.messageList[index];
     if (!li) return;
-    let cotBlock = li.querySelector('.cot-block');
+    let cotDiv = li.querySelector('.cot-placeholder');
+    if (!cotDiv) return;
+    let cotBlock = cotDiv.querySelector('.cot-block');
     if (cotBlock) {
       // 已有则更新
       const cotContent = cotBlock.querySelector('.cot-content');
       if (cotContent) cotContent.textContent = cotStr;
     } else {
       // 没有则创建
-      const cotDiv = this._createCotElement(cotStr);
-      li.appendChild(cotDiv);
+      this._createCotElement(cotStr, index);
     }
   }
 

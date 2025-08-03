@@ -1,4 +1,4 @@
-
+//我要解决部分配置编辑过后需要刷新页面的问题()，然后将apikey也统一到 ConfigManager 中管理
 
 // 在主应用 (main.js) 中：
 class ChatApp {
@@ -13,11 +13,12 @@ class ChatApp {
     this.DEFAULT_SYSTEMS = this.configManager.get('DEFAULT_SYSTEMS')
     this.API_URL_CHAT = this.configManager.get('API_URL_CHAT')
     this.MODEL_NAME_CHAT = this.configManager.get('MODEL_NAME_CHAT')
+    this.API_KEY = this.configManager.get('API_KEY')
 
 
     // 其它初始化...
     this.ui = new UIController()
-    this.api = new ApiClient(localStorage.getItem('apiKey'), this.API_URL_CHAT)
+    this.api = new ApiClient(this.API_KEY, this.API_URL_CHAT)
     this.messages = new Messages()
     this.chatsDB = new LocalArrayDB('chats')
     this.currentChatIndex = localStorage.getItem('currentChatIndex') || 0
@@ -48,7 +49,7 @@ class ChatApp {
   //初始化
   async init() {
     // 检查是否有API Key
-    if (!this.api.apiKey) {
+    if (!this.API_KEY || this.API_KEY === '') {
       this.ui.showError('请先设置API Key')
       return
     }
@@ -335,6 +336,7 @@ class ChatApp {
         (message) => {
           const { content, reasoning_content } = message
           // 只更新最后一条 assistant 消息
+
           this.ui.createOrUpdateMessage({ role: 'assistant', content, reasoning_content }, tempIndex)
           lastText = content
         },
@@ -497,6 +499,7 @@ class ChatApp {
       { type: 'number', name: 'maxRounds', label: '最大对话轮数(0当无限)', value: currentConfig.maxRounds },
       { type: 'text', name: 'API_URL_CHAT', label: '对话API请求地址', value: currentConfig.API_URL_CHAT },
       { type: 'text', name: 'MODEL_NAME_CHAT', label: '对话模型名称', value: currentConfig.MODEL_NAME_CHAT },
+      { type: 'text', name: 'API_KEY', label: 'API Key', value: currentConfig.API_KEY },
       // { type: 'textarea', name: 'DEFAULT_SYSTEMS', label: '默认系统提示词',value: , rows: 5 }
     ]
     //
@@ -516,6 +519,9 @@ class ChatApp {
           const { useStream, useLocalStorage, maxRounds } = formData
           // 更新配置
           this.updateConfig(formData)
+          // 解决部分配置编辑过后需要刷新页面(参数被写死)的问题
+          this.api.setApiKey(formData.API_KEY)
+          this.api.setApiUrl(formData.API_URL_CHAT)
           // 关闭弹窗
           this.ui.dialog.close()
         }
@@ -528,7 +534,8 @@ class ChatApp {
 
       // 设置 API Key
       this.api.setApiKey(apiKey)
-      localStorage.setItem('apiKey', apiKey) // 保存到本地存储
+      // 更新配置管理器中的 API Key
+      this.configManager.set('API_KEY', apiKey)
       console.log('API Key 已设置:', apiKey)
 
       // 提示成功
