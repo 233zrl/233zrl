@@ -45,4 +45,18 @@ class Utils {
       document.body.removeChild(textarea)
     }
   }
+
+  // 获取最新一条消息的快捷回复
+  static getLatestQuickReplies(messages) {
+    const lastIndex = messages.length - 1;
+    return messages[lastIndex]?.quickReplies || null;
+  }
+
+  // 设置最新一条消息的快捷回复
+  static setLatestQuickReplies(messages, quickReplies) {
+    const lastIndex = messages.length - 1;
+    if (messages[lastIndex]) {
+      messages[lastIndex].quickReplies = quickReplies;
+    }
+  }
 }

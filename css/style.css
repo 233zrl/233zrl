@@ -32,6 +32,11 @@ body {
   background-size: cover;
 }
 
+button {
+  background-color: #00000000;
+  color: white
+}
+
 ul,
 dl {
   list-style: none
@@ -152,6 +157,7 @@ button {
   outline: none;
 }
 
+
 .quick-reply-box {
   position: relative;
   display: flex;
@@ -165,6 +171,42 @@ button {
   font-size: 20px;
   margin-left: auto;
 }
+
+.quick-reply-box .quick-reply[data-active="true"] {
+  transform: rotate(45deg);
+  transition: all .3s;
+}
+
+.quick-reply-box .quick-reply[data-active="false"] {
+  transform: rotate(0deg);
+  transition: all .3s;
+}
+
+/* 输入面板 */
+
+
+.inputPanel .panels[data-visible="true"] {
+  max-height: 500px;
+  overflow: auto;
+  transition: all .3s;
+}
+
+.inputPanel .panels[data-visible="false"] {
+  max-height: 0;
+  overflow: hidden;
+  transition: all .3s;
+}
+
+.quick-reply-panel .quick-reply-list .quick-reply-item {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.497);
+}
+
+.quick-reply-panel .quick-reply-list .quick-reply-item:hover {
+  background-color: #00000070;
+}
+
+
 
 /* 聊天列表 
 *-------------------------------------------------------------------------------------
@@ -189,24 +231,26 @@ button {
   border-bottom: 1px solid black;
   border-radius: 10px;
 
-  user-select: none;
   transition: all .5s;
 }
 
-.list>li * {
+.list .message-content * {
   pointer-events: none;
+  user-select: none;
 }
 
-.list>li>div a,
-.list>li>div img {
+.list div a,
+.list div img,
+.list div button,
+.list .cot-placeholder {
   pointer-events: auto;
 }
 
-.list>li:active {
+.list li:active {
   box-shadow: inset 0 3px 6px #000000CC, 0 1px 2px #000000C7;
 }
 
-.list>li:hover {
+.list li:hover {
   padding-bottom: 20px;
 }
 
@@ -273,17 +317,54 @@ button {
   color: black;
 }
 
-.list .cot-block {
-  font-size: 13px;
-  background-color: rgba(0, 0, 0, 0.459);
-  border: black 1px solid;
-}
+
 
 @keyframes blink {
   50% {
     opacity: 0;
   }
 }
+
+/*导航栏-可折叠思维链*/
+
+.list .cot-placeholder .cot-block .cot-title::before {
+  font-family: "iconfont";
+  font-size: 16px;
+  color: #E9C000;
+  margin-right: 5px;
+  float: right;
+}
+
+
+.list .cot-placeholder[data-collapse="true"] .cot-block .cot-title::before {
+  content: "\e65a";
+
+}
+
+.list .cot-placeholder[data-collapse="false"] .cot-block .cot-title::before {
+  content: "\e659";
+}
+
+.list .cot-placeholder[data-collapse="true"] .cot-block .cot-content {
+  max-height: 5000px;
+  /* 设为足够大即可 */
+  overflow: auto;
+  transition: all .5s ease-in-out;
+}
+
+.list .cot-placeholder[data-collapse="false"] .cot-block .cot-content {
+  /* display: none; */
+  max-height: 0;
+  overflow: hidden;
+  transition: all .5s ease-in-out;
+}
+
+.list .cot-block {
+  font-size: 13px;
+  background-color: rgba(0, 0, 0, 0.459);
+  border: black 1px solid;
+}
+
 
 /* 导航栏 
 *-------------------------------------------------------------------------------------
@@ -358,6 +439,46 @@ button {
   border-top: 1px solid black;
   border-bottom: 1px solid black;
 
+}
+
+.nav .setBtn .setBtnList button::after {
+  content: "\e65b";
+  font-family: "iconfont";
+  float: right;
+}
+
+.nav .setBtn .setBtnList button::before {
+  font-family: "iconfont";
+  float: left;
+  margin: 0 5px;
+}
+
+.nav .setBtn .setBtnList button[data-action="add-prompt"]::before {
+  content: "\e7c4";
+}
+
+.nav .setBtn .setBtnList button[data-action="set-prompt"]::before {
+  content: "\e65d";
+}
+
+.nav .setBtn .setBtnList button[data-action="clear-chat"]::before {
+  content: "\e6cc";
+}
+
+.nav .setBtn .setBtnList button[data-action="export-chat"]::before {
+  content: "\e7ea";
+}
+
+.nav .setBtn .setBtnList button[data-action="delete-chat"]::before {
+  content: "\e7ea";
+}
+
+.nav .setBtn .setBtnList button[data-action="edit-config"]::before {
+  content: "\e65d";
+}
+
+.nav .setBtn .setBtnList button[data-action="set-ApiKey"]::before {
+  content: "\e65d";
 }
 
 .nav .setBtn:hover {

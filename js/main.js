@@ -15,6 +15,14 @@ class ChatApp {
     this.MODEL_NAME_CHAT = this.configManager.get('MODEL_NAME_CHAT')
     this.API_KEY = this.configManager.get('API_KEY')
 
+    //快捷回复API参数
+    this.quickReplyUrl = this.configManager.get('API_URL_CHAT')
+    this.quickReplyModel = this.configManager.get('MODEL_NAME_CHAT')
+    this.quickReplyKey = this.configManager.get('API_KEY')
+    this.quickReplyMaxRounds = 0
+
+
+
 
     // 其它初始化...
     this.ui = new UIController()
@@ -42,6 +50,7 @@ class ChatApp {
     this.ui.onScrollToBottom = () => this.ui.scrollToBottom() // 滚动到底部
     this.ui.onSubmit = (content) => this.sendMessage(content) // 发送消息
     this.ui.onAddChat = () => this.onAddChat() // 新增聊天
+    this.ui.onQuickReplyClick = () => this.toggleQuickReplyPanel() // 打开快捷回复面板
 
     // 初始化
     this.init()
@@ -49,6 +58,13 @@ class ChatApp {
   //初始化
   async init() {
     // 检查是否有API Key
+    //读取一下以前的存储位置
+
+    if (localStorage.getItem('apiKey')) {
+      this.API_KEY = localStorage.getItem('apiKey')
+      this.configManager.set('API_KEY', this.API_KEY)
+      localStorage.removeItem('apiKey') // 删除旧的存储位置
+    }
     if (!this.API_KEY || this.API_KEY === '') {
       this.ui.showError('请先设置API Key')
       return
@@ -389,6 +405,55 @@ class ChatApp {
       this.sendNormalRequest(requestBody)
     }
   }
+  //得到快捷回复
+  async getQuickReplies() {
+    //新建messages实例
+    const quickMessages = new Messages()
+    //深拷贝数据
+    quickMessages.messages = JSON.parse(JSON.stringify(this.messages.messages))
+    //处理数据，使AI可以区分user和assistant
+    quickMessages.messages.forEach(msg => {
+      if (msg.role === 'user') {
+        msg.content = `user:${msg.content}`
+      } else if (msg.role === 'assistant') {
+        msg.content = `assistant:${msg.content}`
+      }
+    })
+    //规定回复格式
+    const prompt = `请基于以上聊天记录，模仿user的语气和意图，生成3条快捷回复选项，回复格式: ["回复1","回复2","回复3"] 只能返回json格式的数组`
+    quickMessages.Spush(prompt)
+    quickMessages.Mpush('user', prompt)
+    //构建请求体
+    const requestBody = new ChatRequestBuilder(
+      this.quickReplyModel,
+      quickMessages.getMessages(this.quickReplyMaxRounds),
+      { stream: false, temperature: 0.7, top_P: 0.9, type: 'json_array' },
+      this.quickReplyKey,
+      this.quickReplyUrl
+    )
+    //发送请求
+    try {
+      const api = new ApiClient(this.quickReplyKey, this.quickReplyUrl)
+      // 发送请求
+      const res = await api.send(requestBody)
+      const { content } = res.choices?.[0]?.message
+      //尝试解析json
+      let replies = []
+      try {
+        replies = JSON.parse(content)
+        console.log('解析后的快捷回复:', replies)
+        if (!Array.isArray(replies)) throw new Error('解析结果不是数组')
+      } catch (e) {
+        console.error('解析快捷回复失败:', e)
+        this.ui.showError('快捷回复解析失败，返回内容格式不正确')
+        return []
+      }
+      return replies
+    } catch (e) {
+      this.ui.showError(e.message || '快捷回复请求失败')
+      return []
+    }
+  }
   // 添加系统提示
   addSystemPrompt(showSystemList) {
     // 检查是否正在生成中
@@ -559,7 +624,7 @@ class ChatApp {
     if (this._checkGenerating()) return
 
     // 或者直接从页面中获取？
-    const div = this.ui.messageList[id]?.querySelector('div')
+    const div = this.ui.messageList[id]?.querySelector('.message-content')
     const text = div ? div.innerText || div.textContent : '无内容'
 
     // 构建复制弹窗配置
@@ -608,7 +673,7 @@ class ChatApp {
   }
   // 复制全文
   copyMessageAll(id) {
-    if (this._checkGenerating()) return
+    // if (this._checkGenerating()) return
 
     const msg = this.messages.messages[id]
     const text = msg ? msg.content : '无内容'
@@ -645,6 +710,71 @@ class ChatApp {
     this.maxRounds = this.configManager.get('maxRounds')
     this.DEFAULT_SYSTEMS = this.configManager.get('DEFAULT_SYSTEMS')
     // 其它需要同步的属性也可以加
+  }
+  // 打开快捷回复面板
+  async openQuickReplyPanel() {
+
+    //打开快捷回复面板
+    this.ui.openPanel('quick-reply-panel')
+    //先判断该进度是否已有快捷回复
+    const quickReplies = Utils.getLatestQuickReplies(this.messages.messages)
+    if (quickReplies?.replies?.[0]) {
+      console.log('进度1')
+      // 如果有快捷回复，直接渲染
+      this.ui.renderQuickReplies(quickReplies)
+      return
+    }
+    console.log('进度2')
+    // 如果没有快捷回复，先获取新的快捷回复
+    // 按照格式渲染三个加载中的提示
+    this.ui.renderQuickReplies({ page: 0, replies: [['加载中...', '加载中...', '加载中...']] })
+
+    const replies = await this.getQuickReplies()
+    const quickReplyData = this.buildQuickReplyData(replies)
+    Utils.setLatestQuickReplies(this.messages.messages, quickReplyData)
+    // 渲染数据
+    this.ui.renderQuickReplies(quickReplyData)
+
+    //按理说如果进入进度1，就不会出现进度2了，实际上进度1没有成功进入
+  }
+  // 关闭快捷回复面板
+  closeQuickReplyPanel() {
+    this.ui.closePanel()
+  }
+  //切换快捷回复面板的显示状态
+  toggleQuickReplyPanel() {
+    // 检查是否正在生成中
+    if (this._checkGenerating()) return
+
+    //获取一下按钮
+    const btn = document.querySelector('.quick-reply')
+    //isPanelOpen 方法判断面板是否打开
+    if (this.ui.isPanelOpen('quick-reply-panel')) {
+      btn.dataset.active = 'false'
+      this.closeQuickReplyPanel()
+    } else {
+      btn.dataset.active = 'true'
+      this.openQuickReplyPanel()
+    }
+  }
+  // 快捷回复结构 {page:0,replies:[['回复1','回复2','回复3']...]}
+  //构建完整快速回复结构 已有数据则添加，未有则创建
+  buildQuickReplyData(replies) {
+    // 检查是否为数组
+    if (!Array.isArray(replies)) {
+      console.warn('快捷回复数据格式不正确，应为数组')
+      return { page: 0, replies: [] }
+    }
+    // 获取最新一条消息的快捷回复数据
+    const latestReplies = Utils.getLatestQuickReplies(this.messages.messages)
+    // 如果已有快捷回复数据，则合并
+    if (latestReplies && Array.isArray(latestReplies.replies)) {
+      // 合并新的回复
+      latestReplies.replies.push(replies)
+      return latestReplies
+    }
+    // 如果没有快捷回复数据，则创建新的
+    return { page: 0, replies: [replies] }
   }
 
 

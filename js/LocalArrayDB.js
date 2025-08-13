@@ -1,13 +1,16 @@
 class LocalArrayDB {
   constructor(type = 'requests') {
     this.dbName = 'ChatStreamDB';
-    this.storeName = type; // 根据类型区分存储空间
+    this.storeName = type;
     this.db = null;
-    this.cache = []; // 内存缓存
+    this.cache = []; // 直接存储对象
+    this.initialized = false;
   }
 
   // 初始化数据库
   async init() {
+    if (this.initialized) return;
+
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, 1);
 
@@ -24,9 +27,12 @@ class LocalArrayDB {
       request.onsuccess = async (event) => {
         this.db = event.target.result;
         await this._syncCache();
-        
-        if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
-        
+
+        if (navigator.storage && navigator.storage.persist) {
+          navigator.storage.persist().catch(() => { });
+        }
+
+        this.initialized = true;
         resolve();
       };
 
@@ -34,51 +40,73 @@ class LocalArrayDB {
     });
   }
 
-  // 获取全部数据（返回解析后的JSON数组）
-  async getAll() {
-    await this._syncCache();
-    return this.cache.map(str => JSON.parse(str));
+  // 确保数据库已初始化
+  async ensureInit() {
+    if (!this.initialized) {
+      await this.init();
+    }
   }
 
-  // 添加数据（支持对象或JSON字符串）
+  // 获取全部数据
+  async getAll() {
+    await this.ensureInit();
+    return [...this.cache]; // 返回副本
+  }
+
+  // 添加数据
   async push(item) {
-    const jsonStr = typeof item === 'string' ? item : JSON.stringify(item);
-    await this._addToDB(jsonStr);
-    this.cache.push(jsonStr);
+    await this.ensureInit();
+
+    // 处理无效输入
+    if (item === undefined || item === null) {
+      console.warn('Attempted to push undefined or null value');
+      return;
+    }
+
+    // 直接存储对象
+    await this._addToDB(item);
+    this.cache.push(item);
   }
 
   // 删除最后一条数据
   async pop() {
+    await this.ensureInit();
     if (this.cache.length === 0) return null;
+
     const lastItem = this.cache.pop();
     await this._removeLastFromDB();
-    return JSON.parse(lastItem);
+    return lastItem;
   }
 
   // 类似数组的splice方法
   async splice(start, deleteCount, ...items) {
-    // 获取要插入的JSON字符串
-    const insertItems = items.map(item =>
-      typeof item === 'string' ? item : JSON.stringify(item)
-    );
+    await this.ensureInit();
+
+    // 过滤无效项
+    const validItems = items.filter(item => item !== undefined && item !== null);
 
     // 内存操作
-    const deleted = this.cache.splice(start, deleteCount, ...insertItems);
+    const deleted = this.cache.splice(start, deleteCount, ...validItems);
 
     // 数据库同步
     await this._rebuildDB();
-    return deleted.map(str => JSON.parse(str));
+    return deleted;
   }
 
   // 更新指定位置数据
   async update(index, newItem) {
-    if (index < 0 || index >= this.cache.length) throw new Error('索引越界');
+    await this.ensureInit();
 
-    // 将新数据转换为 JSON 字符串
-    const jsonStr = typeof newItem === 'string' ? newItem : JSON.stringify(newItem);
+    if (index < 0 || index >= this.cache.length) {
+      throw new Error(`索引越界: ${index} (长度: ${this.cache.length})`);
+    }
+
+    if (newItem === undefined || newItem === null) {
+      throw new Error('不能更新为 undefined 或 null');
+    }
 
     // 更新内存缓存
-    this.cache[index] = jsonStr;
+    this.cache[index] = newItem;
 
     // 同步到数据库
     const transaction = this.db.transaction(this.storeName, 'readwrite');
@@ -89,31 +117,44 @@ class LocalArrayDB {
     await new Promise((resolve, reject) => {
       request.onsuccess = (event) => {
         const cursor = event.target.result;
-        if (cursor) {
-          if (currentIndex === index) {
-            // 更新当前记录
-            const updateRequest = cursor.update({ id: cursor.key, data: jsonStr });
-            updateRequest.onsuccess = () => resolve();
-            updateRequest.onerror = reject;
-          } else {
-            currentIndex++;
-            cursor.continue();
-          }
+        if (!cursor) {
+          resolve();
+          return;
+        }
+
+        if (currentIndex === index) {
+          const updateRequest = cursor.update({ id: cursor.key, data: newItem });
+          updateRequest.onsuccess = () => resolve();
+          updateRequest.onerror = () => {
+            console.error('更新失败:', updateRequest.error);
+            reject(updateRequest.error);
+          };
         } else {
-          resolve(); // 如果没有找到对应的索引，直接返回
+          currentIndex++;
+          cursor.continue();
         }
       };
-      request.onerror = reject;
+
+      request.onerror = (event) => {
+        console.error('游标错误:', event.target.error);
+        reject(event.target.error);
+      };
     });
   }
 
   // 清空数据
   async clear() {
+    await this.ensureInit();
+
     this.cache = [];
     const transaction = this.db.transaction(this.storeName, 'readwrite');
     const store = transaction.objectStore(this.storeName);
-    store.clear();
-    await transaction.complete;
+    const request = store.clear();
+
+    await new Promise((resolve, reject) => {
+      request.onsuccess = resolve;
+      request.onerror = reject;
+    });
   }
 
   // 私有方法：同步内存缓存
@@ -122,9 +163,23 @@ class LocalArrayDB {
     const store = transaction.objectStore(this.storeName);
     const request = store.getAll();
 
-    this.cache = await new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result.map(item => item.data));
+    const result = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
       request.onerror = (e) => reject(e);
+    });
+
+    // 确保所有数据都是对象
+    this.cache = result.map(item => {
+      // 如果是从旧版本迁移的数据，data 可能是字符串
+      if (typeof item.data === 'string') {
+        try {
+          return JSON.parse(item.data);
+        } catch (e) {
+          console.warn('解析旧数据失败，保留原始值:', item.data);
+          return item.data;
+        }
+      }
+      return item.data;
     });
   }
 
@@ -132,8 +187,12 @@ class LocalArrayDB {
   async _addToDB(data) {
     const transaction = this.db.transaction(this.storeName, 'readwrite');
     const store = transaction.objectStore(this.storeName);
-    store.add({ data });
-    await transaction.complete;
+    const request = store.add({ data });
+
+    await new Promise((resolve, reject) => {
+      request.onsuccess = resolve;
+      request.onerror = reject;
+    });
   }
 
   // 私有方法：删除最后一条数据库记录
@@ -146,28 +205,39 @@ class LocalArrayDB {
       request.onsuccess = (event) => {
         const cursor = event.target.result;
         if (cursor) {
-          cursor.delete();
-          resolve();
+          const deleteRequest = cursor.delete();
+          deleteRequest.onsuccess = resolve;
+          deleteRequest.onerror = reject;
+        } else {
+          resolve(); // 没有数据可删除
         }
       };
       request.onerror = reject;
     });
   }
 
-  // 私有方法：重建数据库（用于splice等复杂操作）
+  // 私有方法：重建数据库
   async _rebuildDB() {
     const transaction = this.db.transaction(this.storeName, 'readwrite');
     const store = transaction.objectStore(this.storeName);
+    const clearRequest = store.clear();
 
-    // 清空现有数据
-    store.clear();
-
-    // 重新插入缓存数据
-    this.cache.forEach(data => {
-      store.add({ data });
+    // 先清空存储
+    await new Promise((resolve, reject) => {
+      clearRequest.onsuccess = resolve;
+      clearRequest.onerror = reject;
     });
 
-    await transaction.complete;
+    // 批量添加所有缓存项
+    const addPromises = this.cache.map(data => {
+      return new Promise((resolve, reject) => {
+        const request = store.add({ data });
+        request.onsuccess = resolve;
+        request.onerror = reject;
+      });
+    });
+
+    await Promise.all(addPromises);
   }
 }
 /*

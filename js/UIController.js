@@ -10,6 +10,9 @@ class UIController {
     this.submit = document.querySelector('.inputArea .submit')
     this.contextMenu = document.querySelector('.ContextMenu')
     this.toolbar = document.querySelector('.toolbar') // 工具栏小按钮行
+    this.quickReply = document.querySelector('.quick-reply') // 快捷回复按钮
+    this.inputPanel = document.querySelector('.inputPanel') // 输入面板
+    this.quickReplyPanel = document.querySelector('.quick-reply-panel') // 快捷回复列表盒子
 
     // 消息列表缓存
     this.messageList = []
@@ -47,6 +50,12 @@ class UIController {
 
     // 工具栏小按钮事件
     this.toolbar.addEventListener('click', this._handleToolbarClick.bind(this))
+
+    // 快捷回复按钮事件
+    this.quickReply.addEventListener('click', this._handleQuickReplyClick.bind(this))
+
+    // cot-placeholder 折叠/展开事件
+    this.chatList.addEventListener('click', this.toggleCotCollapse.bind(this))
   }
   // 处理导航栏点击事件
   _handleNavClick(e) {
@@ -185,6 +194,77 @@ class UIController {
       behavior: 'smooth' // 平滑滚动动画
     });
   }
+  // 处理快捷回复按钮点击事件
+  _handleQuickReplyClick() {
+    this.onQuickReplyClick?.()
+  }
+
+  // cot-placeholder 折叠/展开事件
+  toggleCotCollapse(e) {
+    const cot = e.target.closest('.cot-placeholder');
+    if (cot) {
+      cot.dataset.collapse = (cot.dataset?.collapse === 'true' ? 'false' : 'true');
+    }
+  }
+
+  // 开启指定类型的面板
+  openPanel(type) {
+    // 先关闭所有面板
+    this.closePanel()
+
+    // 根据类型显示对应的面板
+    const panel = this.inputPanel.querySelector(`.${type}`);
+    if (panel) {
+      panel.dataset.visible = 'true'; // 或者其他显示逻辑
+    } else {
+      console.warn(`未找到类型为 ${type} 的面板`);
+    }
+
+  }
+
+  // 关闭所有面板
+  closePanel() {
+    // 这里可以添加关闭所有面板的逻辑
+    const panels = this.inputPanel.querySelectorAll('.panels');
+    panels.forEach(panel => {
+      panel.dataset.visible = 'false'; // 或者其他关闭逻辑
+    });
+  }
+
+  //isPanelOpen(type) 方法判断面板是否打开
+  isPanelOpen(type) {
+    const panel = this.inputPanel.querySelector(`.${type}`);
+    return panel && panel.dataset.visible === 'true';
+  }
+
+  // 快捷回复结构 {page:0,replies:[['回复1','回复2','回复3']...]}
+  // 渲染快捷回复数据
+  renderQuickReplies(data) {
+
+    if (!data) {
+      console.warn('无效的快捷回复数据')
+      return
+    }
+
+    // 清空现有列表
+    this.quickReplyPanel.querySelector('ul').innerHTML = ''
+
+    //获取页码
+    const page = data.page || 0
+
+    // 遍历数据并渲染
+    data.replies[page]?.forEach((reply, index) => {
+      const li = document.createElement('li')
+      li.textContent = reply
+      li.className = 'quick-reply-item'
+      li.addEventListener('click', () => {
+        this.input.value = reply // 设置输入框内容
+        // this._oninput(this.input) // 手动触发input事件
+      })
+      this.quickReplyPanel.querySelector('ul').appendChild(li)
+    })
+  }
+
 
   // 错误提示框
   showError(message, title = '错误') {
@@ -410,6 +490,7 @@ class UIController {
     if (!cotDiv) {
       cotDiv = document.createElement('div');
       cotDiv.className = 'cot-placeholder'; // 仅作占位，无样式
+      cotDiv.setAttribute('data-collapse', 'false'); // 默认收起
       li.appendChild(cotDiv);
     }
     // 渲染内容
@@ -448,8 +529,10 @@ class UIController {
 
   // 1.创建思维链元素（有样式），插入到占位区，并返回节点
   _createCotElement(cotStr, index) {
+    // 如果没有内容则不创建
     const li = this.messageList[index];
     if (!li) return null;
+    // 如果没有提前划分思维链区域，则不创建
     let cotDiv = li.querySelector('.cot-placeholder');
     if (!cotDiv) return null;
     // 创建有样式的内容

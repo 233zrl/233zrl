@@ -25,7 +25,9 @@
           <li><button data-action="set-ApiKey">设置Api Key</button></li>
         </ul>
         <ul class="setBtnList">
-          <li><button onclick="app.ui.dialog.show({content:'没做，有事进QQ群联系 435761592'})">关于我们</button></li>
+          <li><button
+              onclick="app.ui.dialog.show({content:`没做，有事进QQ群联系 435761592 <br>本页面使用<a href='https://github.com/markdown-it/markdown-it?tab=readme-ov-file'>markdown-it</a>渲染`})">关于我们</button>
+          </li>
         </ul>
       </div>
       <div class="overlay"></div>
@@ -87,13 +89,19 @@
 
 
     </div>
-    <!-- 快捷输入列表 -->
-    <div class="quick-reply-list-box" style="display: none;">
-      <ul class="quick-reply-list">
-        <li class="quick-reply-item">回复1</li>
-        <li class="quick-reply-item">回复2</li>
-        <li class="quick-reply-item">回复3</li>
-      </ul>
+    <div class="inputPanel">
+      <!-- 快捷输入列表 -->
+      <div class="quick-reply-panel panels" data-visible="false">
+        <ul class="quick-reply-list">
+          <li class="quick-reply-item">回复1: 等待</li>
+          <li class="quick-reply-item">回复2: 生成</li>
+          <li class="quick-reply-item">回复3: 中。</li>
+        </ul>
+        <!-- <button></button>
+        <button>换一换</button>
+        <button></button> -->
+      </div>
+
     </div>
   </div>
 

@@ -6,6 +6,62 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "1761731",
+      "name": "添加",
+      "font_class": "tianjia",
+      "unicode": "e7c4",
+      "unicode_decimal": 59332
+    },
+    {
+      "icon_id": "15686583",
+      "name": "清空",
+      "font_class": "qingkong",
+      "unicode": "e6cc",
+      "unicode_decimal": 59084
+    },
+    {
+      "icon_id": "16921554",
+      "name": "删除",
+      "font_class": "shanchu",
+      "unicode": "e7ea",
+      "unicode_decimal": 59370
+    },
+    {
+      "icon_id": "25964407",
+      "name": "编辑",
+      "font_class": "bianji1",
+      "unicode": "e65d",
+      "unicode_decimal": 58973
+    },
+    {
+      "icon_id": "8777509",
+      "name": "arrow_up",
+      "font_class": "icon-test",
+      "unicode": "e658",
+      "unicode_decimal": 58968
+    },
+    {
+      "icon_id": "8777510",
+      "name": "arrow_left",
+      "font_class": "icon-test1",
+      "unicode": "e659",
+      "unicode_decimal": 58969
+    },
+    {
+      "icon_id": "8777511",
+      "name": "arrow_down",
+      "font_class": "icon-test2",
+      "unicode": "e65a",
+      "unicode_decimal": 58970
+    },
+    {
+      "icon_id": "8777512",
+      "name": "arrow_right",
+      "font_class": "icon-test3",
+      "unicode": "e65b",
+      "unicode_decimal": 58971
+    },
+    {
       "icon_id": "44780274",
       "name": "plus_line",
       "font_class": "plus",
