@@ -34,7 +34,8 @@ body {
 
 button {
   background-color: #00000000;
-  color: white
+  color: white;
+  user-select: none;
 }
 
 ul,
@@ -165,25 +166,26 @@ button {
   height: 32px;
 }
 
-.quick-reply-box .quick-reply {
-  background-color: #42445A;
+.quick-reply-box .quick-reply-panel-btn {
+  height: 32px;
+  width: 32px;
+  /* background-color: #42445A; */
   color: white;
   font-size: 20px;
   margin-left: auto;
 }
 
-.quick-reply-box .quick-reply[data-active="true"] {
+.quick-reply-box .quick-reply-panel-btn[data-active="true"] {
   transform: rotate(45deg);
   transition: all .3s;
 }
 
-.quick-reply-box .quick-reply[data-active="false"] {
+.quick-reply-box .quick-reply-panel-btn[data-active="false"] {
   transform: rotate(0deg);
   transition: all .3s;
 }
 
 /* 输入面板 */
-
 
 .inputPanel .panels[data-visible="true"] {
   max-height: 500px;
@@ -204,6 +206,13 @@ button {
 
 .quick-reply-panel .quick-reply-list .quick-reply-item:hover {
   background-color: #00000070;
+}
+
+.quick-reply-prev,
+.quick-reply-next {
+  width: 24px;
+  height: 100%;
+  text-align: center;
 }
 
 
@@ -242,6 +251,8 @@ button {
 .list div a,
 .list div img,
 .list div button,
+.list div code,
+.list div pre,
 .list .cot-placeholder {
   pointer-events: auto;
 }
@@ -338,11 +349,14 @@ button {
 
 .list .cot-placeholder[data-collapse="true"] .cot-block .cot-title::before {
   content: "\e65a";
+  transition: all .2s;
 
 }
 
 .list .cot-placeholder[data-collapse="false"] .cot-block .cot-title::before {
-  content: "\e659";
+  content: "\e65a";
+  transform: rotate(90deg);
+  transition: all .2s;
 }
 
 .list .cot-placeholder[data-collapse="true"] .cot-block .cot-content {

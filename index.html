@@ -83,7 +83,7 @@
     <!-- 快捷按钮行 -->
     <div class="quick-reply-box">
       <div class="absulute-to-right">
-        <button class="quick-reply iconfont">&#xe633;</button>
+        <button class="quick-reply-panel-btn panels-btn iconfont">&#xe633;</button>
         <button class="submit iconfont">&#xe67b;</button>
       </div>
 
@@ -97,9 +97,15 @@
           <li class="quick-reply-item">回复2: 生成</li>
           <li class="quick-reply-item">回复3: 中。</li>
         </ul>
-        <!-- <button></button>
-        <button>换一换</button>
-        <button></button> -->
+        <div style="float: right; ">
+          <button class="quick-reply-prev"
+            onclick=" ms = app.messages.messages ; ms[ms.length - 1].quickReplies.page = Math.max(ms[ms.length - 1].quickReplies.page - 1, 0) ;app.ui.renderQuickReplies(ms[ms.length - 1].quickReplies) ">&lt;</button>
+          <button class="quick-reply-shuffle"
+            onclick="(async function () {const qr = await app.fetchQuickReplies();app.ui.renderQuickReplies(qr)})()">换一换
+            (1/1)</button>
+          <button class="quick-reply-next"
+            onclick=" ms = app.messages.messages ; ms[ms.length - 1].quickReplies.page = Math.min(ms[ms.length - 1].quickReplies.page + 1, ms[ms.length - 1].quickReplies.replies.length - 1) ;app.ui.renderQuickReplies(ms[ms.length - 1].quickReplies) ">&gt;</button>
+        </div>
       </div>
 
     </div>

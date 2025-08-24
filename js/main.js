@@ -411,6 +411,7 @@ class ChatApp {
     const quickMessages = new Messages()
     //深拷贝数据
     quickMessages.messages = JSON.parse(JSON.stringify(this.messages.messages))
+    quickMessages.systems = JSON.parse(JSON.stringify(this.messages.systems))
     //处理数据，使AI可以区分user和assistant
     quickMessages.messages.forEach(msg => {
       if (msg.role === 'user') {
@@ -419,8 +420,10 @@ class ChatApp {
         msg.content = `assistant:${msg.content}`
       }
     })
+    //获得页码加入提示词防止命中缓存，生成一样的回复
+    const page = Utils.getLatestQuickReplies(this.messages.messages).page
     //规定回复格式
-    const prompt = `请基于以上聊天记录，模仿user的语气和意图，生成3条快捷回复选项，回复格式: ["回复1","回复2","回复3"] 只能返回json格式的数组`
+    const prompt = `这是第${page}次请求，请不要生成一样的回复。请基于以上聊天记录，模仿user的语气和意图，主动推进进度，生成3条快捷回复选项，回复格式: ["回复1","回复2","回复3"] 只能返回json格式的数组`
     quickMessages.Spush(prompt)
     quickMessages.Mpush('user', prompt)
     //构建请求体
@@ -709,33 +712,29 @@ class ChatApp {
     this.useLocalStorage = this.configManager.get('useLocalStorage')
     this.maxRounds = this.configManager.get('maxRounds')
     this.DEFAULT_SYSTEMS = this.configManager.get('DEFAULT_SYSTEMS')
+    this.MODEL_NAME_CHAT = this.configManager.get('MODEL_NAME_CHAT')
     // 其它需要同步的属性也可以加
   }
   // 打开快捷回复面板
   async openQuickReplyPanel() {
+    // 检查是否正在生成中
+    if (this._checkGenerating()) return
 
     //打开快捷回复面板
     this.ui.openPanel('quick-reply-panel')
     //先判断该进度是否已有快捷回复
     const quickReplies = Utils.getLatestQuickReplies(this.messages.messages)
     if (quickReplies?.replies?.[0]) {
-      console.log('进度1')
+
       // 如果有快捷回复，直接渲染
       this.ui.renderQuickReplies(quickReplies)
       return
     }
-    console.log('进度2')
+
     // 如果没有快捷回复，先获取新的快捷回复
-    // 按照格式渲染三个加载中的提示
-    this.ui.renderQuickReplies({ page: 0, replies: [['加载中...', '加载中...', '加载中...']] })
-
-    const replies = await this.getQuickReplies()
-    const quickReplyData = this.buildQuickReplyData(replies)
-    Utils.setLatestQuickReplies(this.messages.messages, quickReplyData)
-    // 渲染数据
-    this.ui.renderQuickReplies(quickReplyData)
-
-    //按理说如果进入进度1，就不会出现进度2了，实际上进度1没有成功进入
+    const latestReplies = await this.fetchQuickReplies()
+    // 渲染快捷回复
+    this.ui.renderQuickReplies(latestReplies)
   }
   // 关闭快捷回复面板
   closeQuickReplyPanel() {
@@ -743,17 +742,16 @@ class ChatApp {
   }
   //切换快捷回复面板的显示状态
   toggleQuickReplyPanel() {
-    // 检查是否正在生成中
-    if (this._checkGenerating()) return
+
 
     //获取一下按钮
-    const btn = document.querySelector('.quick-reply')
+    // const btn = document.querySelector('.quick-reply')
     //isPanelOpen 方法判断面板是否打开
     if (this.ui.isPanelOpen('quick-reply-panel')) {
-      btn.dataset.active = 'false'
+      // btn.dataset.active = 'false'
       this.closeQuickReplyPanel()
     } else {
-      btn.dataset.active = 'true'
+      // btn.dataset.active = 'true'
       this.openQuickReplyPanel()
     }
   }
@@ -763,7 +761,7 @@ class ChatApp {
     // 检查是否为数组
     if (!Array.isArray(replies)) {
       console.warn('快捷回复数据格式不正确，应为数组')
-      return { page: 0, replies: [] }
+      return { page: 0, replies: ['失败'] }
     }
     // 获取最新一条消息的快捷回复数据
     const latestReplies = Utils.getLatestQuickReplies(this.messages.messages)
@@ -771,10 +769,31 @@ class ChatApp {
     if (latestReplies && Array.isArray(latestReplies.replies)) {
       // 合并新的回复
       latestReplies.replies.push(replies)
+      // 修改页码
+      latestReplies.page = latestReplies.replies.length - 1
       return latestReplies
     }
     // 如果没有快捷回复数据，则创建新的
     return { page: 0, replies: [replies] }
+  }
+  // 获取快捷回复并构建数据
+  async fetchQuickReplies() {
+    // 按照格式渲染三个加载中的提示
+    this.ui.renderQuickReplies({ page: 0, replies: [['加载中...', '加载中...', '加载中...']] })
+    // 获取快捷回复
+    const replies = await this.getQuickReplies()
+    // 如果获取失败或为空，返回错误提示
+    if (replies.length === 0) {
+      // 如果获取失败，显示错误提示
+      this.ui.renderQuickReplies({ page: 0, replies: [['获取失败']] })
+      return { page: 0, replies: ['获取失败'] }
+    }
+    // 构建完整快捷回复数据
+    const quickReplyData = this.buildQuickReplyData(replies)
+    // 保存到最新消息中
+    Utils.setLatestQuickReplies(this.messages.messages, quickReplyData)
+    //返回结果
+    return quickReplyData
   }
 
 

@@ -10,8 +10,8 @@ class UIController {
     this.submit = document.querySelector('.inputArea .submit')
     this.contextMenu = document.querySelector('.ContextMenu')
     this.toolbar = document.querySelector('.toolbar') // 工具栏小按钮行
-    this.quickReply = document.querySelector('.quick-reply') // 快捷回复按钮
     this.inputPanel = document.querySelector('.inputPanel') // 输入面板
+    this.quickReply = document.querySelector('.quick-reply-panel-btn') // 快捷回复按钮
     this.quickReplyPanel = document.querySelector('.quick-reply-panel') // 快捷回复列表盒子
 
     // 消息列表缓存
@@ -209,28 +209,45 @@ class UIController {
 
   // 开启指定类型的面板
   openPanel(type) {
-    // 先关闭所有面板
-    this.closePanel()
+    this.closePanel();
 
-    // 根据类型显示对应的面板
     const panel = this.inputPanel.querySelector(`.${type}`);
-    if (panel) {
-      panel.dataset.visible = 'true'; // 或者其他显示逻辑
-    } else {
-      console.warn(`未找到类型为 ${type} 的面板`);
-    }
+    const btn = document.querySelector(`.${type}-btn`); // 新增按钮选择
 
+    if (panel && btn) {
+      panel.dataset.visible = 'true';
+      btn.dataset.active = 'true'; // 同步按钮状态
+
+      const closeHandler = (e) => {
+        // 排除面板、按钮及其子元素
+        if (!this.inputPanel.contains(e.target) &&
+          !btn.contains(e.target)) {
+          this.closePanel();
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+
+      document.addEventListener('click', closeHandler, true);
+
+      // 同时阻止按钮和面板的冒泡
+      [panel, btn].forEach(el => {
+        el.querySelectorAll('*').forEach(child => {
+          child.addEventListener('click', e => e.stopPropagation());
+        });
+      });
+    }
   }
 
   // 关闭所有面板
   closePanel() {
-    // 这里可以添加关闭所有面板的逻辑
-    const panels = this.inputPanel.querySelectorAll('.panels');
-    panels.forEach(panel => {
-      panel.dataset.visible = 'false'; // 或者其他关闭逻辑
+    document.querySelectorAll('.panels').forEach(panel => {
+      panel.dataset.visible = 'false';
+    });
+    // 同时关闭所有关联按钮的状态
+    document.querySelectorAll('.panels-btn').forEach(btn => {
+      btn.dataset.active = 'false';
     });
   }
-
   //isPanelOpen(type) 方法判断面板是否打开
   isPanelOpen(type) {
     const panel = this.inputPanel.querySelector(`.${type}`);
@@ -259,10 +276,14 @@ class UIController {
       li.className = 'quick-reply-item'
       li.addEventListener('click', () => {
         this.input.value = reply // 设置输入框内容
-        // this._oninput(this.input) // 手动触发input事件
+        this._oninput(this.input) // 手动触发input事件
       })
       this.quickReplyPanel.querySelector('ul').appendChild(li)
     })
+
+    //更新页码显示
+    const shuffleBtn = this.quickReplyPanel.querySelector('.quick-reply-shuffle')
+    shuffleBtn.textContent = `换一换 (${page + 1}/${data.replies.length})`
   }
 
 
