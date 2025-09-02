@@ -67,7 +67,6 @@ class ChatApp {
     }
     if (!this.API_KEY || this.API_KEY === '') {
       this.ui.showError('请先设置API Key')
-      return
     }
 
     //本地数据初始化
@@ -411,17 +410,24 @@ class ChatApp {
     const quickMessages = new Messages()
     //深拷贝数据
     quickMessages.messages = JSON.parse(JSON.stringify(this.messages.messages))
-    quickMessages.systems = JSON.parse(JSON.stringify(this.messages.systems))
+    const systems = JSON.parse(JSON.stringify(this.messages.systems))
+
     //处理数据，使AI可以区分user和assistant
     quickMessages.messages.forEach(msg => {
       if (msg.role === 'user') {
         msg.content = `user:${msg.content}`
+        msg.role = 'assistant' //把user都改成assistant
       } else if (msg.role === 'assistant') {
         msg.content = `assistant:${msg.content}`
+        msg.role = 'user' //把assistant都改成user
       }
     })
+    //加入伪装的user系统提示
+    const systemContent = `${systems.map(system => { return `assistant:{${system?.content || ''}}` }).join(',')} 这些是从系统提示继承的内容，一般认为只会影响AI，除非特殊说明以上内容只对ai方有效，仅做信息共享，你不需要模仿。`
+    quickMessages.messages.unshift({ role: 'user', content: systemContent })
+
     //获得页码加入提示词防止命中缓存，生成一样的回复
-    const page = Utils.getLatestQuickReplies(this.messages.messages).page
+    const page = Utils.getLatestQuickReplies(this.messages.messages)?.page || 0
     //规定回复格式
     const prompt = `这是第${page}次请求，请不要生成一样的回复。请基于以上聊天记录，模仿user的语气和意图，主动推进进度，生成3条快捷回复选项，回复格式: ["回复1","回复2","回复3"] 只能返回json格式的数组`
     quickMessages.Spush(prompt)
@@ -439,6 +445,7 @@ class ChatApp {
       const api = new ApiClient(this.quickReplyKey, this.quickReplyUrl)
       // 发送请求
       const res = await api.send(requestBody)
+      console.log(requestBody)
       const { content } = res.choices?.[0]?.message
       //尝试解析json
       let replies = []
