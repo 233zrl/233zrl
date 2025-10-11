@@ -207,6 +207,7 @@ class UIController {
     }
   }
 
+
   // 开启指定类型的面板
   openPanel(type) {
     this.closePanel();
@@ -630,7 +631,29 @@ class UIController {
   }
 
 }
+//预计改成一个类，因为我想起来函数只能用一次
+class ToggleButton {
+  constructor(element, on, off) {
+    // 如果传入的是选择器字符串，则查询元素
+    if (typeof element === 'string') {
+      element = document.querySelector(element);
+    }
 
+    // 绑定点击事件和开启关闭的回调函数
+    if (element) {
+      element.addEventListener('click', () => {
+        const isOn = element.dataset.state === 'on';
+        if (isOn) {
+          element.dataset.state = 'off';
+          off?.();
+        } else {
+          element.dataset.state = 'on';
+          on?.();
+        }
+      })
+    }
+  }
+}
 
 
 // 弹窗管理器------------------------------------------------------------------

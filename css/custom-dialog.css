@@ -341,7 +341,7 @@ input[type="checkbox"] {
 
 .toast-message {
   position: fixed;
-  top: 20px;
+  bottom: 20%;
   left: 50%;
   transform: translateX(-50%);
   background-color: rgba(0, 0, 0, 0.7);

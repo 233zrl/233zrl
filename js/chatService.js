@@ -161,35 +161,51 @@ Messages.prototype.getHintSystem = function () {
   }
 }
 
-// 获取最近 N 轮消息（每轮2条，用户+AI），rounds为0或无效时返回全部
-Messages.prototype.getRecentMessages = function (rounds) {
-  //先格式化
-  const messages = this.messages.map((item) => {
-    //确保发送的消息格式正确
-    const { role, content } = item
-    return {
-      role,
-      content
-    }
-  })
+// 获取最近 N - 周期 轮消息（每轮2条，用户+AI），baseRounds 为基础轮数，cycleRounds 为周期轮数
+Messages.prototype.getRecentMessages = function (baseRounds, cycleRounds) {
+  // 1. 格式化消息（保留role和content）
+  const messages = this.messages.map(item => ({
+    role: item.role,
+    content: item.content
+  }));
+  const msgTotal = messages.length; // 信息总数（如20轮对话→40）
+  const totalRounds = msgTotal / 2; // 总轮数（信息数÷2）
 
-  if (rounds === undefined || rounds === null || rounds === 0 || isNaN(rounds)) {
-    return messages
+  // 2. 基础轮数无效时，返回全部
+  if (!baseRounds || isNaN(baseRounds) || baseRounds <= 0) {
+    return messages;
   }
-  const total = this.messages.length
-  const n = Math.max(0, total - rounds * 2)
 
-  return messages.slice(n)
-}
+  // 3. 按你的规则计算（以“轮数”为基准）
+  // 步骤1：周期轮数在“总轮数”中的最大倍数（如周期5，总轮20→最大倍数20）
+  const maxCycleRoundMultiple = cycleRounds > 0
+    ? Math.floor(totalRounds / cycleRounds) * cycleRounds
+    : 0;
+  // 步骤2：实际轮数 = 基础轮数 +（总轮数 - 最大周期倍数）（你的例子：5 + (20-20)=5）
+  const actualRounds = baseRounds + (totalRounds - maxCycleRoundMultiple);
+  // 步骤3：映射到信息数→实际信息数=实际轮数×2；n=信息总数-实际信息数（你的例子：40 - 5×2=30）
+  const actualMsgCount = actualRounds * 2;
+  const n = Math.max(msgTotal - actualMsgCount, 0); // 确保n≥0
+
+  // 调试验证（20轮对话举例）
+  console.log(`总轮数：${totalRounds}，信息总数：${msgTotal}`);
+  console.log(`周期最大倍（轮数）：${maxCycleRoundMultiple}，实际轮数：${actualRounds}`);
+  console.log(`实际信息数：${actualMsgCount}，n：${n}`); // 输出n=30
+
+  // 4. 返回从n开始的消息（20轮举例：slice(30)→取最后10条信息=最后5轮）
+  return messages.slice(n);
+};
+
+
 
 // 获取所有消息（系统提示+hint+用户消息）
-Messages.prototype.getMessages = function (rounds) {
+Messages.prototype.getMessages = function (baseRounds, cycleRounds) {
   // 先获取开启的系统提示
   const systems = this.getOpenSystems()
   // 加入 hintData
   systems.unshift(this.getHintSystem())
   // 获取消息片段
-  const messages = this.getRecentMessages(rounds)
+  const messages = this.getRecentMessages(baseRounds, cycleRounds)
   // 合并返回
   return [
     ...systems,

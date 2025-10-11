@@ -10,6 +10,7 @@ class ChatApp {
     this.useStream = this.configManager.get('useStream')
     this.useLocalStorage = this.configManager.get('useLocalStorage')
     this.maxRounds = this.configManager.get('maxRounds')
+    this.roundsCycle = this.configManager.get('roundsCycle')
     this.DEFAULT_SYSTEMS = this.configManager.get('DEFAULT_SYSTEMS')
     this.API_URL_CHAT = this.configManager.get('API_URL_CHAT')
     this.MODEL_NAME_CHAT = this.configManager.get('MODEL_NAME_CHAT')
@@ -318,9 +319,16 @@ class ChatApp {
   //如果生成状态在生成中被 改变为false 可以中断生成
   // 普通请求
   async sendNormalRequest(requestBody) {
+    // 如果使用免费配置，覆盖部分配置
+    const useFreeConfig = window.useFreeConfig || false;
+    const apiUrl = useFreeConfig ? 'https://api.pianren.top/api/chat' : this.API_URL_CHAT;
+    const modelName = useFreeConfig ? 'chat' : this.MODEL_NAME_CHAT;
+    const apiKey = useFreeConfig ? '' : (this.API_KEY);
+    const api = new ApiClient(apiKey, apiUrl);
+
     let reply = ''
     try {
-      const res = await this.api.send(requestBody)
+      const res = await api.send(requestBody)
       const { role, content, reasoning_content } = res.choices?.[0]?.message
       reply = content || '无回复'
       this.messages.Mpush({ role: 'assistant', content: reply, reasoning_content })
@@ -341,12 +349,18 @@ class ChatApp {
 
   // 流式请求
   async sendStreamRequest(requestBody) {
+    // 如果使用免费配置，覆盖部分配置
+    const useFreeConfig = window.useFreeConfig || false;
+    const apiUrl = useFreeConfig ? 'https://api.pianren.top/api/chat' : this.API_URL_CHAT;
+    const modelName = useFreeConfig ? 'chat' : this.MODEL_NAME_CHAT;
+    const apiKey = useFreeConfig ? '' : (this.API_KEY);
+    const api = new ApiClient(apiKey, apiUrl);
     let lastText = ''
     let tempIndex = this.messages.messages.length
     // 先插入一条空的 assistant 消息作为占位
     this.ui.createOrUpdateMessage({ role: 'assistant', content: '' }, tempIndex)
     try {
-      await this.api.strSend(
+      await api.strSend(
         requestBody,
         (message) => {
           const { content, reasoning_content } = message
@@ -391,10 +405,17 @@ class ChatApp {
     this.messages.Mpush('user', content)
     this.ui.renderNewMessage({ role: 'user', content })
 
+    // 如果使用免费配置，覆盖部分配置
+    const useFreeConfig = window.useFreeConfig || false;
+    const maxRounds = useFreeConfig ? 100 : this.maxRounds;
+
+
     // 构建请求体，动态决定是否流式
+
+    console.log(this.messages.getMessages(this.maxRounds, this.roundsCycle))
     const requestBody = new ChatRequestBuilder(
       this.MODEL_NAME_CHAT,
-      this.messages.getMessages(this.maxRounds),
+      this.messages.getMessages(this.maxRounds, 25),
       { stream: isStream, temperature: 0.5, top_P: 0.95 })
 
 
@@ -572,6 +593,7 @@ class ChatApp {
       { type: 'switch', name: 'useStream', label: '开启流式回复', value: currentConfig.useStream },
       { type: 'switch', name: 'useLocalStorage', label: '开启本地存储(不建议关)', value: currentConfig.useLocalStorage },
       { type: 'number', name: 'maxRounds', label: '最大对话轮数(0当无限)', value: currentConfig.maxRounds },
+      { type: 'number', name: 'roundsCycle', label: '对话轮数周期(0当无限)本功能旨在防止因为限制上文频繁变动上下文导致无法命中缓存导致成本增加，周期轮数就是超过最大轮数后每多少轮变动一次上下文', value: currentConfig.roundsCycle },
       { type: 'text', name: 'API_URL_CHAT', label: '对话API请求地址', value: currentConfig.API_URL_CHAT },
       { type: 'text', name: 'MODEL_NAME_CHAT', label: '对话模型名称', value: currentConfig.MODEL_NAME_CHAT },
       { type: 'text', name: 'API_KEY', label: 'API Key', value: currentConfig.API_KEY },
@@ -582,7 +604,7 @@ class ChatApp {
     // 打开配置编辑弹窗
     this.ui.dialog.show(
       {
-        title: '编辑配置',
+        title: '编辑配置(部分需要重启生效)',
         content,
         buttons: [
           { text: "取消", type: "default", onClick: () => this.ui.dialog.close() },

@@ -3,6 +3,8 @@ window.defaultConfig = {
   useStream: true, // 是否开启流式回复
   useLocalStorage: true, // 是否开启本地存储
   maxRounds: 0, // 最大对话轮数，0表示不限制
+  //对话轮数周期，每超过最大轮数周期轮，则清空上一周期的对话内容，防止频繁变动上文导致无法命中上下文缓存。 0表示不限制
+  roundsCycle: 0,
   //默认提示词
   DEFAULT_SYSTEMS: [
     {

@@ -102,11 +102,12 @@ button {
 }
 
 .toolbar button {
+  font-size: 14px;
   border: black .5px solid;
   border-radius: 5px;
   background-color: #42445acd;
   color: white;
-  padding: 1px 2px;
+  padding: 1px 7px;
 }
 
 .toolbar .left {
@@ -228,6 +229,7 @@ button {
   overflow-y: scroll;
   overflow-x: hidden;
   margin: 20px 5px 5px 5px;
+  padding: 20px 0 30px 0;
 }
 
 .list>li {
@@ -235,8 +237,8 @@ button {
   width: auto;
 
   margin-bottom: 5px;
-  margin: 8px 10px;
-  padding: 10px;
+  margin: 30px 10px;
+  padding: 5px 10px;
 
   background: #42445AEE;
   color: white;
