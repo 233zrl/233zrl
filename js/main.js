@@ -407,7 +407,7 @@ class ChatApp {
 
     // 如果使用免费配置，覆盖部分配置
     const useFreeConfig = window.useFreeConfig || false;
-    const maxRounds = useFreeConfig ? 100 : this.maxRounds;
+    const maxRounds = useFreeConfig ? 50 : this.maxRounds;
 
 
     // 构建请求体，动态决定是否流式
