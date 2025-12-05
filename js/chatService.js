@@ -155,7 +155,7 @@ Messages.prototype.getHintSystem = function () {
   return {
     role: 'system',
     content: `
-    你的名字是：${this.hintData.name || '未知'}，现实实时 时间：${currentTime}，时间戳：废弃
+    你的名字||标题是：${this.hintData.name || '未知'}，现实实时 时间：${currentTime}，时间戳：废弃
     `,
     open: true
   }

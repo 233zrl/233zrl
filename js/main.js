@@ -322,7 +322,6 @@ class ChatApp {
     // 如果使用免费配置，覆盖部分配置
     const useFreeConfig = window.useFreeConfig || false;
     const apiUrl = useFreeConfig ? 'https://api.pianren.top/api/chat' : this.API_URL_CHAT;
-    const modelName = useFreeConfig ? 'chat' : this.MODEL_NAME_CHAT;
     const apiKey = useFreeConfig ? '' : (this.API_KEY);
     const api = new ApiClient(apiKey, apiUrl);
 
@@ -352,7 +351,6 @@ class ChatApp {
     // 如果使用免费配置，覆盖部分配置
     const useFreeConfig = window.useFreeConfig || false;
     const apiUrl = useFreeConfig ? 'https://api.pianren.top/api/chat' : this.API_URL_CHAT;
-    const modelName = useFreeConfig ? 'chat' : this.MODEL_NAME_CHAT;
     const apiKey = useFreeConfig ? '' : (this.API_KEY);
     const api = new ApiClient(apiKey, apiUrl);
     let lastText = ''
@@ -407,15 +405,16 @@ class ChatApp {
 
     // 如果使用免费配置，覆盖部分配置
     const useFreeConfig = window.useFreeConfig || false;
-    const maxRounds = useFreeConfig ? 50 : this.maxRounds;
+    const maxRounds = useFreeConfig ? 40 : this.maxRounds;
+    const modelName = useFreeConfig ? 'chat' : this.MODEL_NAME_CHAT;
 
 
     // 构建请求体，动态决定是否流式
 
     console.log(this.messages.getMessages(this.maxRounds, this.roundsCycle))
     const requestBody = new ChatRequestBuilder(
-      this.MODEL_NAME_CHAT,
-      this.messages.getMessages(this.maxRounds, 25),
+      modelName,
+      this.messages.getMessages(maxRounds, 25),
       { stream: isStream, temperature: 0.5, top_P: 0.95 })
 
 
