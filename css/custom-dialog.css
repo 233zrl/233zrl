@@ -21,6 +21,24 @@
   backdrop-filter: blur(3px);
 }
 
+/* 弹窗入场动画 */
+@keyframes dialog-fade-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.custom-dialog[open] {
+  animation: dialog-fade-in 0.3s ease-out;
+}
+
+
 /* 弹窗头部 */
 .dialog-header {
   padding: 10px 12px;
