@@ -406,7 +406,7 @@ class ChatApp {
     // 如果使用免费配置，覆盖部分配置
     const useFreeConfig = window.useFreeConfig || false;
     const maxRounds = useFreeConfig ? 40 : this.maxRounds;
-    const modelName = useFreeConfig ? 'chat' : this.MODEL_NAME_CHAT;
+    const modelName = useFreeConfig ? 'deepseek-chat' : this.MODEL_NAME_CHAT;
 
 
     // 构建请求体，动态决定是否流式
