@@ -74,6 +74,8 @@ class UIController {
         "delete-chat": () => this.onDeleteChat?.(),
         "edit-config": () => this.onEditConfig?.(),
         "set-ApiKey": () => this.onSetApiKey?.(),
+        "downChat": () => this.onDownloadChat?.(),
+        "upChat": () => this.onUploadChat?.(),
       }
 
       // 执行操作或提示未知类型
@@ -341,7 +343,7 @@ class UIController {
   }
 
   // 显示聊天列表管理弹窗
-  showChatListDialog(chatList, { onSwitch, onEdit, onDelete, onAddChat }) {
+  showChatListDialog(chatList, { onSwitch, onEdit, onDelete, onAddChat, onCopyChat }) {
     this.dialog.show({
       title: '聊天记录管理',
       list: {
@@ -374,6 +376,14 @@ class UIController {
           type: '',
           onClick: async () => {
             onAddChat?.()
+          }
+        },
+        {
+          text: '复制',
+          type: '',
+          actionType: 'item-action',
+          onClick: async (item) => {
+            onCopyChat?.(item.idx);
           }
         },
         {

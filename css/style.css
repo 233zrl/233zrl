@@ -263,6 +263,10 @@ button {
   pointer-events: auto;
 }
 
+.list .cot-placeholder .cot-block {
+  border-radius: 5px;
+}
+
 .list li:active {
   box-shadow: inset 0 3px 6px #000000CC, 0 1px 2px #000000C7;
 }
@@ -291,6 +295,7 @@ button {
   border: 1px solid white;
   border-radius: 5px;
   background-color: rgba(0, 0, 0, 0.3);
+  margin: 5px 0;
 }
 
 .list table {
@@ -300,6 +305,7 @@ button {
   border: 1px solid white;
   background-color: rgba(0, 0, 0, 0.3);
   overflow: hidden;
+  margin: 5px 0;
 }
 
 .list th,
@@ -517,6 +523,15 @@ button {
 
 .nav .setBtn .setBtnList button[data-action="set-ApiKey"]::before {
   content: "\e65d";
+}
+
+/*下载和上传聊天*/
+.nav .setBtn .setBtnList button[data-action="downChat"]::before {
+  content: "\e641";
+}
+
+.nav .setBtn .setBtnList button[data-action="upChat"]::before {
+  content: "\e640";
 }
 
 .nav .setBtn:hover {

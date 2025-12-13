@@ -23,8 +23,6 @@ class ChatApp {
     this.quickReplyMaxRounds = 0
 
 
-
-
     // 其它初始化...
     this.ui = new UIController()
     this.api = new ApiClient(this.API_KEY, this.API_URL_CHAT)
@@ -33,26 +31,7 @@ class ChatApp {
     this.currentChatIndex = localStorage.getItem('currentChatIndex') || 0
 
     // 绑定回调
-    //顶部导航栏
-    this.ui.onAddPrompt = () => this.addSystemPrompt() // 添加系统提示
-    this.ui.onSetPrompt = () => this.showSystemList() // 管理提示词-- --暂无
-    this.ui.onClearChat = () => this.clearCurrentChat() // 清空当前聊天
-    this.ui.onDeleteChat = () => this.deleteCurrentChat() // 删除当前聊天
-    this.ui.onSwitchChat = () => this.showChatList() // 切换聊天列表
-    this.ui.onEditConfig = () => this.editConfig() // 编辑可配置项
-    this.ui.onSetApiKey = () => this.setApiKey() // 设置API Key
-    //上下文菜单
-    this.ui.onUndo = (id) => this.undoMessage(id) // 撤回消息
-    this.ui.onCopy = (id) => this.copyMessage(id) // 复制消息
-    this.ui.onEdit = (id) => this.editMessage(id) // 编辑消息
-    this.ui.onCopyAll = (id) => this.copyMessageAll(id) // 复制全文
-    // 底部
-    this.ui.onInterrupt = () => this.interruptGenerate() // 中断生成
-    this.ui.onScrollToBottom = () => this.ui.scrollToBottom() // 滚动到底部
-    this.ui.onSubmit = (content) => this.sendMessage(content) // 发送消息
-    this.ui.onAddChat = () => this.onAddChat() // 新增聊天
-    this.ui.onQuickReplyClick = () => this.toggleQuickReplyPanel() // 打开快捷回复面板
-
+    this.bindUICallbacks()
     // 初始化
     this.init()
   }
@@ -103,6 +82,31 @@ class ChatApp {
       console.error('初始化数据库失败:', e)
       this.ui.showError('初始化数据库失败，请检查浏览器支持情况')
     }
+  }
+  //绑定UI回调
+  bindUICallbacks() {
+    //顶部导航栏
+    this.ui.onAddPrompt = () => this.addSystemPrompt() // 添加系统提示
+    this.ui.onSetPrompt = () => this.showSystemList() // 管理提示词-- --暂无
+    this.ui.onClearChat = () => this.clearCurrentChat() // 清空当前聊天
+    this.ui.onDeleteChat = () => this.deleteCurrentChat() // 删除当前聊天
+    this.ui.onSwitchChat = () => this.showChatList() // 切换聊天列表
+    this.ui.onEditConfig = () => this.editConfig() // 编辑可配置项
+    this.ui.onSetApiKey = () => this.setApiKey() // 设置API Key
+    this.ui.onDownloadChat = () => this.downloadChat() //下载聊天记录
+    this.ui.onUploadChat = () => this.uploadChat() //上传聊天记录
+    //上下文菜单
+    this.ui.onUndo = (id) => this.undoMessage(id) // 撤回消息
+    this.ui.onCopy = (id) => this.copyMessage(id) // 复制消息
+    this.ui.onEdit = (id) => this.editMessage(id) // 编辑消息
+    this.ui.onCopyAll = (id) => this.copyMessageAll(id) // 复制全文
+    // 底部
+    this.ui.onInterrupt = () => this.interruptGenerate() // 中断生成
+    this.ui.onScrollToBottom = () => this.ui.scrollToBottom() // 滚动到底部
+    this.ui.onSubmit = (content) => this.sendMessage(content) // 发送消息
+    this.ui.onAddChat = () => this.onAddChat() // 新增聊天
+    this.ui.onQuickReplyClick = () => this.toggleQuickReplyPanel() // 打开快捷回复面板
+    this.ui.onDownloadChat = () => this.downloadChat() //下载聊天记录
   }
   // 根据索引加载聊天记录
   async loadChatByIndex(index = false) {
@@ -165,36 +169,50 @@ class ChatApp {
       this.ui.showError(e.message || '保存聊天记录失败')
     }
   }
-  // 新增聊天数据
-  async addNewChat(name = '', systems = []) {
-    // 检查是否正在生成中
+  // 通用方法：添加一个完整的聊天对象到本地存储
+  // chatObj: { messages, systems, hintData }，可用于导入/复制聊天
+  async addChatObject(chatObj = {}) {
+    // 检查是否正在生成中，防止并发冲突
     if (this._checkGenerating()) return
     // 检查是否开启本地存储
     if (!this._checkLocalStorage()) return
 
-    //根据name、默认systems创建一个新的聊天记录
-
-    //获取长度
+    // 获取当前聊天总数，用于生成默认名称
     const chats = await this.chatsDB.getAll();
     const length = chats.length;
 
+    // 构建新聊天对象，确保结构完整
     const newChat = {
-      messages: [],
-      systems: systems || [],
-      hintData: { name: name || `未命名会话${length + 1}` },
+      messages: Array.isArray(chatObj.messages) ? chatObj.messages : [],
+      systems: Array.isArray(chatObj.systems) ? chatObj.systems : [],
+      // hintData 至少要有 name 字段
+      hintData: {
+        ...(typeof chatObj.hintData === 'object' ? chatObj.hintData : {}),
+        name: chatObj.hintData?.name || chatObj.name || `未命名会话${length + 1}`
+      }
     }
 
-    // 将新的聊天记录添加到数据库
     try {
+      // 添加到本地数据库
       await this.chatsDB.push(newChat)
       console.log('新聊天记录已添加:', newChat.hintData.name)
-
-      // 切换到新聊天记录
+      // 自动切换到新建的聊天
       await this.loadChatByIndex(length)
     } catch (e) {
       console.error('添加新聊天记录失败:', e)
       this.ui.showError(e.message || '添加新聊天记录失败')
     }
+  }
+
+  // 封装方法：只传 name 和 systems，自动补全结构
+  // 适合普通新建聊天时调用
+  async addNewChat(name = '', systems = []) {
+    // 调用通用方法，自动补全结构
+    return this.addChatObject({
+      messages: [],
+      systems: systems || [],
+      hintData: { name: name }
+    })
   }
 
   // 编辑聊天标题
@@ -261,6 +279,12 @@ class ChatApp {
       onAddChat: async () => {
         // 新增聊天
         await this.onAddChat();
+      },
+      onCopyChat: async (index) => {
+
+        // 调用复制聊天方法
+        await this.copyChat(index);
+
       }
     });
   }
@@ -484,6 +508,8 @@ class ChatApp {
       return []
     }
   }
+
+  //侧边栏
   // 添加系统提示
   addSystemPrompt(showSystemList) {
     // 检查是否正在生成中
@@ -641,6 +667,53 @@ class ChatApp {
     this.ui.showInputDialog({ title: '请输入Api Key', placeholder: '请输入Api Key', value: '', onConfirm })
 
   }
+  // 下载聊天记录
+  async downloadChat() {
+    // 检查是否正在生成中
+    if (this._checkGenerating()) return
+    //使用 messages 方法导出聊天记录，然后通过 Utils 下载
+    const chatData = this.messages.toExportData()
+    //转成字符串
+    const chatDataStr = JSON.stringify(chatData, null, 2)
+    Utils.downloadFile(`${this.messages.hintData.name || 'chat'}.json`, chatData)
+  }
+  // 上传聊天记录
+  async uploadChat() {
+    // 检查是否正在生成中
+    if (this._checkGenerating()) return
+    // 使用 Utils 打开文件选择对话框并读取 JSON 文件
+    const file = await Utils.pickLocalFile()
+    const chatData = await Utils.readFileAsText(file)
+    // 解析 JSON
+    let parsedData
+    try {
+      //解析数据
+      parsedData = JSON.parse(chatData)
+    } catch (e) {
+      // 解析失败
+      this.ui.showError('无效的聊天记录文件')
+      return
+    }
+    // 解析为messages通用格式
+    this.messages.parseCompatible(parsedData)
+    // 新建聊天记录
+    await this.addChatObject({
+      messages: this.messages.messages,
+      systems: this.messages.systems,
+      hintData: this.messages.hintData
+    })
+    // 切换到新建的聊天
+    const chats = await this.chatsDB.getAll()
+    await this.loadChatByIndex(chats.length - 1)
+    // 刷新 UI
+    this.ui.renderMessageList(this.messages.messages)
+    // 提示成功
+    this.ui.showSuccess('聊天记录上传成功')
+
+  }
+
+
+  // 上下文菜单
   // 撤回消息
   undoMessage(id) {
     // 检查是否正在生成中
@@ -730,6 +803,31 @@ class ChatApp {
       this.addNewChat(name, defaultSystems)
     }
     this.ui.showInputDialog({ title: '输入聊天名称', placeholder: '聊天名称', value: '', onConfirm })
+  }
+  // 复制聊天记录
+  async copyChat(index) {
+    // 检查是否正在生成中
+    if (this._checkGenerating()) return
+    // 检查是否开启本地存储
+    if (!this._checkLocalStorage()) return
+
+    // 切换到指定索引的聊天记录
+    await this.loadChatByIndex(index)
+    // 深拷贝当前聊天记录
+    const chatData = JSON.parse(JSON.stringify({
+      messages: this.messages.messages,
+      systems: this.messages.systems,
+      hintData: this.messages.hintData
+    }))
+    // 新建聊天记录
+    await this.addChatObject(chatData)
+    // 切换到新建的聊天
+    const chats = await this.chatsDB.getAll()
+    await this.loadChatByIndex(chats.length - 1)
+    // 刷新 UI
+    this.ui.renderMessageList(this.messages.messages)
+    // 刷新弹窗
+    this.showChatList()
   }
   // 修改配置
   updateConfig(newConfig) {

@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const freeBtn = document.createElement('button')
   freeBtn.textContent = '对话免费模式'
   freeBtn.classList.add('left')
+  // 创建配置
+  
   // 初始状态样式
   freeBtn.style.border = '#f44336 solid 2px' // 红色表示关闭
 
