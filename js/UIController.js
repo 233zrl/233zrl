@@ -70,10 +70,12 @@ class UIController {
 
         "add-prompt": () => this.onAddPrompt?.(),
         "set-prompt": () => this.onSetPrompt?.(),
+        "manage-faketc": () => this.onManageFakeTC?.(),
         "clear-chat": () => this.onClearChat?.(),
         "delete-chat": () => this.onDeleteChat?.(),
         "edit-config": () => this.onEditConfig?.(),
         "set-ApiKey": () => this.onSetApiKey?.(),
+        "quick-config": () => this.onQuickConfig?.(),
         "downChat": () => this.onDownloadChat?.(),
         "upChat": () => this.onUploadChat?.(),
       }
@@ -95,7 +97,7 @@ class UIController {
   _handleContextMenu(e) {
     e.preventDefault()
 
-    const messageItem = e.target.closest('li')
+    const messageItem = e.target.closest('li[data-id]')
     if (!messageItem) return
 
     // 显示菜单
@@ -485,6 +487,67 @@ class UIController {
 
     this.dialog.show(config)
   }
+  // 显示思维链提示词管理弹窗
+  showFakeTCListDialog(list, { useReasoning, onToggleReasoning, onEdit, onToggle, onDelete, onMove, onAdd }) {
+    const items = list.map((tc, index) => ({
+      id: index,
+      name: tc.toolName || '?',
+      thinking: (tc.thinking || '').slice(0, 30),
+      result: (tc.toolResult || '').slice(0, 50),
+      open: tc.open !== false ? '开启' : '关闭',
+    }))
+
+    const renderItem = (item) => {
+      const div = document.createElement('div')
+      div.className = 'list-item-content'
+      div.innerHTML = `
+        <strong>${item.name}</strong>
+        <div style="font-size:11px;color:#ccc;">💭 ${item.thinking || '…'}${item.thinking.length >= 30 ? '...' : ''}</div>
+        <div style="font-size:11px;color:#aaa;">→ ${item.result}${item.result.length >= 50 ? '...' : ''}</div>
+        <span class="status">${item.open}</span>
+      `
+      return div
+    }
+
+    this.dialog.show({
+      title: `🧠 思维链提示词 (${useReasoning ? '推理' : '普通'}模式)`,
+      list: { items, searchable: true, renderItem },
+      buttons: [
+        {
+          text: useReasoning ? '🧠 推理模式' : '📝 普通模式', type: 'default',
+          onClick: () => { onToggleReasoning?.(); this.dialog.close() }
+        },
+        {
+          text: '↑', type: 'default', actionType: 'item-action',
+          onClick: (item) => { this.dialog.close(); onMove?.(item.id, 'up') }
+        },
+        {
+          text: '↓', type: 'default', actionType: 'item-action',
+          onClick: (item) => { this.dialog.close(); onMove?.(item.id, 'down') }
+        },
+        {
+          text: '编辑', type: 'default', actionType: 'item-action',
+          onClick: (item) => { this.dialog.close(); onEdit?.(item.id) }
+        },
+        {
+          text: '开/关', type: 'default', actionType: 'item-action',
+          onClick: (item) => { this.dialog.close(); onToggle?.(item.id) }
+        },
+        {
+          text: '添加', type: 'default',
+          onClick: () => { this.dialog.close(); onAdd?.() }
+        },
+        {
+          text: '删除', type: 'danger', actionType: 'item-action',
+          onClick: (item) => { this.dialog.close(); onDelete?.(item.id) }
+        },
+        {
+          text: '关闭', type: 'default',
+          onClick: () => this.dialog.close()
+        }
+      ]
+    })
+  }
   // 显示Toast消息
   showToast(message, duration = 2000) {
     // 创建或复用Toast元素
@@ -748,6 +811,12 @@ class DialogManager {
     dialog.appendChild(form);
     document.body.appendChild(dialog);
     dialog.showModal();
+
+    // 弹窗打开后回调
+    if (typeof config.onOpen === 'function') {
+      setTimeout(() => config.onOpen(), 50); // 等 DOM 就绪
+    }
+
     return dialog;
   }
 
@@ -836,6 +905,12 @@ class DialogManager {
     const container = document.createElement('div');
     container.className = 'form-field';
 
+    // html 类型：直接插入原始 HTML
+    if (field.type === 'html') {
+      container.innerHTML = field.html || '';
+      return container;
+    }
+
     if (field.label) {
       const label = document.createElement('label');
       label.textContent = field.label;
@@ -882,6 +957,7 @@ class DialogManager {
     button.textContent = btn.text;
     button.className = `dialog-btn ${btn.type || 'default'}`;
     button.type = btn.submit ? 'submit' : 'button';
+    if (btn.id) button.id = btn.id;
 
     if (btn.actionType === 'item-action') {
       button.addEventListener('click', (e) => {

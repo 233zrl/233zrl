@@ -1,24 +1,4 @@
 class Utils {
-  // 更新当前时间 -- 废弃
-  static updateCurrentTime(obj) {
-    if (!obj) return {
-      currentTime: '初始化时间',
-      // currentTime_TS: 0,
-    }
-    console.log('更新当前时间:', obj)
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = String(now.getMonth() + 1).padStart(2, '0') // 月份从0开始
-    const day = String(now.getDate()).padStart(2, '0')
-    const hours = String(now.getHours()).padStart(2, '0')
-
-    obj.currentTime = `${year}年${month}月${day}日 ${hours}时` // 格式化为 YYYY-MM-DD HH
-
-    // obj.currentTime = now.toLocaleString()
-    // obj.currentTime_TS = now.getTime()
-    return obj
-  }
-
   // 通用复制到剪贴板
   static copyToClipboard(text, onSuccess, onError) {
     if (!text) {

@@ -6,26 +6,25 @@ class ChatApp {
     // 配置管理器，所有配置都通过它读写
     this.configManager = new ConfigManager(window.defaultConfig)
 
-    // 读取配置项
+    // 通用配置
     this.useStream = this.configManager.get('useStream')
     this.useLocalStorage = this.configManager.get('useLocalStorage')
     this.maxRounds = this.configManager.get('maxRounds')
     this.roundsCycle = this.configManager.get('roundsCycle')
     this.DEFAULT_SYSTEMS = this.configManager.get('DEFAULT_SYSTEMS')
-    this.API_URL_CHAT = this.configManager.get('API_URL_CHAT')
-    this.MODEL_NAME_CHAT = this.configManager.get('MODEL_NAME_CHAT')
-    this.API_KEY = this.configManager.get('API_KEY')
 
-    //快捷回复API参数
-    this.quickReplyUrl = this.configManager.get('API_URL_CHAT')
-    this.quickReplyModel = this.configManager.get('MODEL_NAME_CHAT')
-    this.quickReplyKey = this.configManager.get('API_KEY')
+    // 迁移旧版扁平 API 配置 → provider 架构
+    this._migrateOldConfig()
+
+    // 从激活的 provider 读取 API 参数
+    const provider = this._getActiveProvider()
+
+    // 快捷回复参数
     this.quickReplyMaxRounds = 0
-
 
     // 其它初始化...
     this.ui = new UIController()
-    this.api = new ApiClient(this.API_KEY, this.API_URL_CHAT)
+    this.api = new ApiClient(provider.apiKey, provider.apiUrl)
     this.messages = new Messages()
     this.chatsDB = new LocalArrayDB('chats')
     this.currentChatIndex = localStorage.getItem('currentChatIndex') || 0
@@ -37,18 +36,6 @@ class ChatApp {
   }
   //初始化
   async init() {
-    // 检查是否有API Key
-    //读取一下以前的存储位置
-
-    if (localStorage.getItem('apiKey')) {
-      this.API_KEY = localStorage.getItem('apiKey')
-      this.configManager.set('API_KEY', this.API_KEY)
-      localStorage.removeItem('apiKey') // 删除旧的存储位置
-    }
-    if (!this.API_KEY || this.API_KEY === '') {
-      this.ui.showError('请先设置API Key')
-    }
-
     //本地数据初始化
     if (this._checkLocalStorage()) await this.initDB()
     //回到底部
@@ -87,12 +74,14 @@ class ChatApp {
   bindUICallbacks() {
     //顶部导航栏
     this.ui.onAddPrompt = () => this.addSystemPrompt() // 添加系统提示
-    this.ui.onSetPrompt = () => this.showSystemList() // 管理提示词-- --暂无
+    this.ui.onSetPrompt = () => this.showSystemList() // 管理提示词
+    this.ui.onManageFakeTC = () => this.showFakeTCList() // 思维链提示词
     this.ui.onClearChat = () => this.clearCurrentChat() // 清空当前聊天
     this.ui.onDeleteChat = () => this.deleteCurrentChat() // 删除当前聊天
     this.ui.onSwitchChat = () => this.showChatList() // 切换聊天列表
     this.ui.onEditConfig = () => this.editConfig() // 编辑可配置项
     this.ui.onSetApiKey = () => this.setApiKey() // 设置API Key
+    this.ui.onQuickConfig = () => this.quickConfig() // 快捷配置
     this.ui.onDownloadChat = () => this.downloadChat() //下载聊天记录
     this.ui.onUploadChat = () => this.uploadChat() //上传聊天记录
     //上下文菜单
@@ -129,13 +118,8 @@ class ChatApp {
       this.messages.messages = chats[index].messages || []
       this.messages.systems = chats[index].systems || []
       this.messages.hintData = chats[index].hintData || { name: `未命名会话${index + 1}` }
-      // 兼容历史数据，确保 toolState 存在
-      if (!this.messages.hintData.toolState) {
-        this.messages.hintData.toolState = {
-          currentTime: '同步失败',
-          currentTime_TS: 0,
-        }
-      }
+      this.messages.fakeToolCalls = chats[index].fakeToolCalls || []
+      this.messages.useReasoning = chats[index].useReasoning !== false
       // 刷新 UI
       this.ui.renderMessageList(this.messages.messages)
       // 更新显示的Name
@@ -154,12 +138,14 @@ class ChatApp {
     // 获取有效索引
     index = this._getIndex(index)
     try {
-      const { messages, systems, hintData } = this.messages
+      const { messages, systems, hintData, fakeToolCalls, useReasoning } = this.messages
       // 把他们打包成一个对象
       const chatData = {
         messages,
         systems,
         hintData,
+        fakeToolCalls: fakeToolCalls || [],
+        useReasoning: useReasoning !== undefined ? useReasoning : true,
       }
       // 保存聊天记录到数据库
       await this.chatsDB.update(index, chatData)
@@ -185,6 +171,7 @@ class ChatApp {
     const newChat = {
       messages: Array.isArray(chatObj.messages) ? chatObj.messages : [],
       systems: Array.isArray(chatObj.systems) ? chatObj.systems : [],
+      fakeToolCalls: Array.isArray(chatObj.fakeToolCalls) ? chatObj.fakeToolCalls : [],
       // hintData 至少要有 name 字段
       hintData: {
         ...(typeof chatObj.hintData === 'object' ? chatObj.hintData : {}),
@@ -340,13 +327,105 @@ class ChatApp {
 
   }
 
+  // ========== 思维链提示词管理 ==========
+  async showFakeTCList() {
+    if (this._checkGenerating()) return
+
+    const list = this.messages.fakeToolCalls || []
+    const self = this
+
+    const onEdit = (index) => {
+      const tc = list[index]
+      self.ui.dialog.show({
+        title: '编辑思维链提示',
+        content: [
+          { type: 'text', name: 'toolName', label: '工具名称', value: tc.toolName, placeholder: 'think' },
+          { type: 'textarea', name: 'thinking', label: '思维链', value: tc.thinking || '', placeholder: '模型会看到这段"内心独白"……', rows: 3 },
+          { type: 'textarea', name: 'toolResult', label: '工具返回结果', value: tc.toolResult, placeholder: 'OK', rows: 3 },
+          { type: 'textarea', name: 'note', label: '备注', value: tc.note || '', placeholder: '可选', rows: 2 },
+        ],
+        buttons: [
+          { text: '取消', type: 'default', onClick: () => self.ui.dialog.close() },
+          { text: '保存', type: 'primary', submit: true }
+        ],
+        onSubmit: (formData) => {
+          self.messages.setFakeTC(index, {
+            toolName: formData.toolName,
+            thinking: formData.thinking,
+            toolResult: formData.toolResult,
+            note: formData.note,
+          })
+          self.ui.dialog.close()
+          self.showFakeTCList()
+          if (self._checkLocalStorage()) self.saveChatByIndex()
+        }
+      })
+    }
+
+    const onToggle = (index) => {
+      self.messages.toggleFakeTCOpen(index)
+      self.showFakeTCList()
+      if (self._checkLocalStorage()) self.saveChatByIndex()
+    }
+
+    const onDelete = (index) => {
+      self.messages.deleteFakeTC(index)
+      self.showFakeTCList()
+      if (self._checkLocalStorage()) self.saveChatByIndex()
+    }
+
+    const onMove = (index, dir) => {
+      self.messages.moveFakeTC(index, dir)
+      self.showFakeTCList()
+      if (self._checkLocalStorage()) self.saveChatByIndex()
+    }
+
+    const onAdd = () => {
+      self.ui.dialog.show({
+        title: '新增思维链提示',
+        content: [
+          { type: 'text', name: 'toolName', label: '工具名称', value: 'think', placeholder: 'think' },
+          { type: 'textarea', name: 'thinking', label: '思维链', value: '', placeholder: '模型会看到这段"内心独白"……', rows: 3 },
+          { type: 'textarea', name: 'toolResult', label: '工具返回结果', value: 'OK', placeholder: 'OK', rows: 3 },
+          { type: 'textarea', name: 'note', label: '备注', value: '', placeholder: '可选', rows: 2 },
+        ],
+        buttons: [
+          { text: '取消', type: 'default', onClick: () => self.ui.dialog.close() },
+          { text: '添加', type: 'primary', submit: true }
+        ],
+        onSubmit: (formData) => {
+          self.messages.FakeTCpush({
+            toolName: formData.toolName,
+            thinking: formData.thinking,
+            toolResult: formData.toolResult,
+            note: formData.note,
+          })
+          self.ui.dialog.close()
+          self.showFakeTCList()
+          if (self._checkLocalStorage()) self.saveChatByIndex()
+        }
+      })
+    }
+
+    self.ui.showFakeTCListDialog(list, {
+      useReasoning: self.messages.useReasoning,
+      onToggleReasoning: () => {
+        self.messages.toggleReasoning()
+        self.showFakeTCList()
+        if (self._checkLocalStorage()) self.saveChatByIndex()
+      },
+      onEdit, onToggle, onDelete, onMove, onAdd
+    })
+  }
+
   //如果生成状态在生成中被 改变为false 可以中断生成
   // 普通请求
   async sendNormalRequest(requestBody) {
     // 如果使用免费配置，覆盖部分配置
     const useFreeConfig = window.useFreeConfig || false;
-    const apiUrl = useFreeConfig ? 'https://api.pianren.top/api/chat' : this.API_URL_CHAT;
-    const apiKey = useFreeConfig ? '' : (this.API_KEY);
+    const cfg = this._getApiConfig();
+    const apiUrl = useFreeConfig ? 'https://api.pianren.top/api/chat' : cfg.apiUrl;
+    const apiKey = useFreeConfig ? '' : cfg.apiKey;
     const api = new ApiClient(apiKey, apiUrl);
 
     let reply = ''
@@ -374,8 +453,9 @@ class ChatApp {
   async sendStreamRequest(requestBody) {
     // 如果使用免费配置，覆盖部分配置
     const useFreeConfig = window.useFreeConfig || false;
-    const apiUrl = useFreeConfig ? 'https://api.pianren.top/api/chat' : this.API_URL_CHAT;
-    const apiKey = useFreeConfig ? '' : (this.API_KEY);
+    const cfg = this._getApiConfig();
+    const apiUrl = useFreeConfig ? 'https://api.pianren.top/api/chat' : cfg.apiUrl;
+    const apiKey = useFreeConfig ? '' : cfg.apiKey;
     const api = new ApiClient(apiKey, apiUrl);
     let lastText = ''
     let tempIndex = this.messages.messages.length
@@ -419,7 +499,6 @@ class ChatApp {
   // 发送消息，支持参数控制流式，对话轮数限制
   sendMessage(content, isStream = this.useStream) {
 
-
     // 检查是否正在生成中
     if (this._checkGenerating()) return
     // 检查内容是否为空
@@ -428,18 +507,17 @@ class ChatApp {
     this.ui.renderNewMessage({ role: 'user', content })
 
     // 如果使用免费配置，覆盖部分配置
+    const cfg = this._getApiConfig();
     const useFreeConfig = window.useFreeConfig || false;
-    const maxRounds = useFreeConfig ? 40 : this.maxRounds;
-    const modelName = useFreeConfig ? 'deepseek-chat' : this.MODEL_NAME_CHAT;
-
+    const maxRounds = useFreeConfig ? 40 : cfg.maxRounds;
+    const modelName = useFreeConfig ? 'deepseek-chat' : cfg.modelName;
 
     // 构建请求体，动态决定是否流式
-
-    console.log(this.messages.getMessages(this.maxRounds, this.roundsCycle))
+    console.log(this.messages.getMessages(cfg.maxRounds, cfg.roundsCycle))
     const requestBody = new ChatRequestBuilder(
       modelName,
       this.messages.getMessages(maxRounds, 25),
-      { stream: isStream, temperature: 0.5, top_P: 0.95 })
+      { stream: isStream, temperature: 0.5, top_P: 0.95  })
 
 
     if (isStream) {
@@ -477,16 +555,15 @@ class ChatApp {
     quickMessages.Spush(prompt)
     quickMessages.Mpush('user', prompt)
     //构建请求体
+    const cfg = this._getApiConfig();
     const requestBody = new ChatRequestBuilder(
-      this.quickReplyModel,
+      cfg.modelName,
       quickMessages.getMessages(this.quickReplyMaxRounds),
-      { stream: false, temperature: 0.7, top_P: 0.9, type: 'json_array' },
-      this.quickReplyKey,
-      this.quickReplyUrl
+      { stream: false, temperature: 0.7, top_P: 0.9, type: 'json_array' }
     )
     //发送请求
     try {
-      const api = new ApiClient(this.quickReplyKey, this.quickReplyUrl)
+      const api = new ApiClient(cfg.apiKey, cfg.apiUrl)
       // 发送请求
       const res = await api.send(requestBody)
       console.log(requestBody)
@@ -618,18 +695,15 @@ class ChatApp {
       { type: 'switch', name: 'useStream', label: '开启流式回复', value: currentConfig.useStream },
       { type: 'switch', name: 'useLocalStorage', label: '开启本地存储(不建议关)', value: currentConfig.useLocalStorage },
       { type: 'number', name: 'maxRounds', label: '最大对话轮数(0当无限)', value: currentConfig.maxRounds },
-      { type: 'number', name: 'roundsCycle', label: '对话轮数周期(0当无限)本功能旨在防止因为限制上文频繁变动上下文导致无法命中缓存导致成本增加，周期轮数就是超过最大轮数后每多少轮变动一次上下文', value: currentConfig.roundsCycle },
-      { type: 'text', name: 'API_URL_CHAT', label: '对话API请求地址', value: currentConfig.API_URL_CHAT },
-      { type: 'text', name: 'MODEL_NAME_CHAT', label: '对话模型名称', value: currentConfig.MODEL_NAME_CHAT },
-      { type: 'text', name: 'API_KEY', label: 'API Key', value: currentConfig.API_KEY },
-      // { type: 'textarea', name: 'DEFAULT_SYSTEMS', label: '默认系统提示词',value: , rows: 5 }
+      { type: 'number', name: 'roundsCycle', label: '对话轮数周期(0当无限)', value: currentConfig.roundsCycle },
+      { type: 'html', html: '<p style="color:#E9C000;font-size:12px;">💡 API地址/Key/模型请用 <b>⚡快捷配置</b></p>' },
     ]
     //
 
     // 打开配置编辑弹窗
     this.ui.dialog.show(
       {
-        title: '编辑配置(部分需要重启生效)',
+        title: '编辑配置',
         content,
         buttons: [
           { text: "取消", type: "default", onClick: () => this.ui.dialog.close() },
@@ -637,13 +711,8 @@ class ChatApp {
         ],
         onSubmit: (formData) => {
           console.log(formData)
-          // 声明一下
-          const { useStream, useLocalStorage, maxRounds } = formData
           // 更新配置
           this.updateConfig(formData)
-          // 解决部分配置编辑过后需要刷新页面(参数被写死)的问题
-          this.api.setApiKey(formData.API_KEY)
-          this.api.setApiUrl(formData.API_URL_CHAT)
           // 关闭弹窗
           this.ui.dialog.close()
         }
@@ -653,19 +722,18 @@ class ChatApp {
   //设置API Key
   setApiKey() {
     const onConfirm = (apiKey) => {
-
-      // 设置 API Key
+      const providers = this.configManager.get('providers') || []
+      const activeId = this.configManager.get('activeProviderId')
+      const p = providers.find(x => x.id === activeId)
+      if (p) {
+        p.apiKey = apiKey
+        this._saveProviders(providers)
+      }
       this.api.setApiKey(apiKey)
-      // 更新配置管理器中的 API Key
-      this.configManager.set('API_KEY', apiKey)
-      console.log('API Key 已设置:', apiKey)
-
-      // 提示成功
       this.ui.showSuccess('API Key 设置成功')
     }
     //通用输入框
     this.ui.showInputDialog({ title: '请输入Api Key', placeholder: '请输入Api Key', value: '', onConfirm })
-
   }
   // 下载聊天记录
   async downloadChat() {
@@ -695,12 +763,13 @@ class ChatApp {
       return
     }
     // 解析为messages通用格式
-    this.messages.parseCompatible(parsedData)
+    const { messages, systems, hintData, fakeToolCalls } = this.messages.parseCompatible(parsedData)
     // 新建聊天记录
     await this.addChatObject({
-      messages: this.messages.messages,
-      systems: this.messages.systems,
-      hintData: this.messages.hintData
+      messages,
+      systems,
+      hintData,
+      fakeToolCalls: fakeToolCalls || [],
     })
     // 切换到新建的聊天
     const chats = await this.chatsDB.getAll()
@@ -817,7 +886,8 @@ class ChatApp {
     const chatData = JSON.parse(JSON.stringify({
       messages: this.messages.messages,
       systems: this.messages.systems,
-      hintData: this.messages.hintData
+      hintData: this.messages.hintData,
+      fakeToolCalls: this.messages.fakeToolCalls,
     }))
     // 新建聊天记录
     await this.addChatObject(chatData)
@@ -829,6 +899,58 @@ class ChatApp {
     // 刷新弹窗
     this.showChatList()
   }
+  // ==================== Provider 管理 ====================
+
+  // 获取当前激活的服务商
+  _getActiveProvider() {
+    const providers = this.configManager.get('providers') || []
+    const activeId = this.configManager.get('activeProviderId')
+    const found = providers.find(p => p.id === activeId)
+    if (found) return found
+    // 降级：返回第一个 provider，或空占位
+    if (providers.length > 0) return providers[0]
+    return { id: '', name: '未配置', apiUrl: '', apiKey: '', models: [], selectedModel: '' }
+  }
+
+  // 保存 provider 列表
+  _saveProviders(providers) {
+    this.configManager.set('providers', providers)
+  }
+
+  // 迁移旧版扁平 API 配置 → provider
+  _migrateOldConfig() {
+    const oldKey = this.configManager.get('API_KEY')
+    const oldUrl = this.configManager.get('API_URL_CHAT')
+    const oldModel = this.configManager.get('MODEL_NAME_CHAT')
+    if (!oldKey && !oldUrl) return // 没旧数据，跳过
+
+    const providers = this.configManager.get('providers') || []
+    const deepseek = providers.find(p => p.id === 'deepseek')
+    if (deepseek) {
+      if (oldKey) deepseek.apiKey = oldKey
+      if (oldUrl) deepseek.apiUrl = oldUrl
+      if (oldModel) deepseek.selectedModel = oldModel
+      this._saveProviders(providers)
+    }
+    // 清除旧字段
+    this.configManager.set('API_KEY', '')
+    this.configManager.set('API_URL_CHAT', '')
+    this.configManager.set('MODEL_NAME_CHAT', '')
+  }
+
+  // 实时获取 API 配置
+  _getApiConfig() {
+    const p = this._getActiveProvider()
+    return {
+      apiKey: p.apiKey,
+      apiUrl: p.apiUrl,
+      modelName: p.selectedModel,
+      useStream: this.configManager.get('useStream'),
+      maxRounds: this.configManager.get('maxRounds'),
+      roundsCycle: this.configManager.get('roundsCycle'),
+    }
+  }
+
   // 修改配置
   updateConfig(newConfig) {
     // 批量更新配置
@@ -837,9 +959,228 @@ class ChatApp {
     this.useStream = this.configManager.get('useStream')
     this.useLocalStorage = this.configManager.get('useLocalStorage')
     this.maxRounds = this.configManager.get('maxRounds')
+    this.roundsCycle = this.configManager.get('roundsCycle')
     this.DEFAULT_SYSTEMS = this.configManager.get('DEFAULT_SYSTEMS')
-    this.MODEL_NAME_CHAT = this.configManager.get('MODEL_NAME_CHAT')
-    // 其它需要同步的属性也可以加
+    // 同步 apiClient
+    const p = this._getActiveProvider()
+    this.api.setApiKey(p.apiKey)
+    this.api.setApiUrl(p.apiUrl)
+  }
+
+  // ==================== 快捷配置弹窗 ====================
+
+  async quickConfig() {
+    if (this._checkGenerating()) return
+
+    const self = this
+    const providers = JSON.parse(JSON.stringify(this.configManager.get('providers') || []))
+    let currentAid = this.configManager.get('activeProviderId')
+
+    // ---- DOM 快捷函数（DialogManager 只设 name，不设 id，所以用 name 选择器）----
+    const $ = (sel) => document.querySelector(sel)
+    const $id = (id) => document.getElementById(id)
+
+    const getUrlInput = () => $('[name="apiUrl"]')
+    const getKeyInput = () => $('[name="apiKey"]')
+    const getModelSelect = () => $id('quickCfgModel')
+    const getStatusEl = () => $id('quickCfgStatus')
+    const getTabsEl = () => $id('quickCfgTabs')
+    const getDelBtn = () => $id('quickCfgDelBtn')
+    const getFetchBtn = () => $id('quickCfgFetchBtn')
+    const getAddBtn = () => $id('quickCfgAddBtn')
+    const getHiddenAid = () => $id('quickCfgActiveId')
+
+    // 获取当前 activeId 对应的 provider，降级取第一个
+    const curProvider = () => providers.find(x => x.id === currentAid) || providers[0] || {}
+
+    // ---- 渲染函数 ----
+    const renderTabs = () => {
+      const tabsEl = getTabsEl()
+      if (!tabsEl) return
+      tabsEl.innerHTML = providers.map(prv => {
+        const isActive = prv.id === currentAid
+        const style = isActive
+          ? 'background:#E9C000;color:#1a1a2e;font-weight:bold;'
+          : 'background:#333;color:#ccc;'
+        return `<button type="button" data-pid="${prv.id}" style="margin:2px;padding:4px 10px;border:1px solid #555;border-radius:4px;cursor:pointer;font-size:12px;${style}">${prv.name}</button>`
+      }).join('') + `<button type="button" id="quickCfgAddBtn" style="margin:2px;padding:4px 8px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;">+</button>`
+    }
+
+    const renderDetail = () => {
+      const p = curProvider()
+      const urlInput = getUrlInput()
+      const keyInput = getKeyInput()
+      const modelSelect = getModelSelect()
+      const statusEl = getStatusEl()
+      const delBtn = getDelBtn()
+      if (urlInput) urlInput.value = p.apiUrl || ''
+      if (keyInput) keyInput.value = p.apiKey || ''
+      if (delBtn) delBtn.style.display = providers.length <= 1 ? 'none' : ''
+      if (statusEl) statusEl.innerHTML = ''
+      if (modelSelect) {
+        const models = p.models || []
+        if (models.length) {
+          modelSelect.innerHTML = models.map(m =>
+            `<option value="${m.id}" ${m.id === p.selectedModel ? 'selected' : ''}>${m.id}${m.owned_by ? ` (${m.owned_by})` : ''}</option>`
+          ).join('')
+          modelSelect.disabled = false
+        } else {
+          modelSelect.innerHTML = '<option>请先获取模型列表</option>'
+          modelSelect.disabled = true
+        }
+      }
+    }
+
+    // 切换服务商
+    const switchTo = (pid) => {
+      const idx = providers.findIndex(x => x.id === pid)
+      if (idx === -1) return
+      // 先写回当前表单值
+      const urlInput = getUrlInput()
+      const keyInput = getKeyInput()
+      const old = providers.find(x => x.id === currentAid)
+      if (old) {
+        if (urlInput) old.apiUrl = urlInput.value
+        if (keyInput) old.apiKey = keyInput.value
+      }
+      // 切换
+      currentAid = providers[idx].id
+      renderAll()
+    }
+
+    const renderAll = () => {
+      const hidden = getHiddenAid()
+      if (hidden) hidden.value = currentAid
+      renderTabs()
+      renderDetail()
+      bindEvents()
+    }
+
+    const bindEvents = () => {
+      // 标签点击
+      getTabsEl()?.querySelectorAll('button[data-pid]').forEach(btn => {
+        btn.onclick = () => switchTo(btn.dataset.pid)
+      })
+      // + 添加
+      const addBtn = getAddBtn()
+      if (addBtn) {
+        addBtn.onclick = () => {
+          const name = prompt('服务商名称（如 OpenAI / 火山引擎）')
+          if (!name) return
+          const url = prompt('API 地址（完整 chat/completions 路径）', 'https://api.openai.com/v1/chat/completions')
+          if (!url) return
+          const key = prompt('API Key（可选，稍后填）') || ''
+          const newId = 'provider_' + Date.now()
+          providers.push({ id: newId, name, apiUrl: url, apiKey: key, models: [], selectedModel: '' })
+          switchTo(newId)
+        }
+      }
+      // 删除
+      const delBtn = getDelBtn()
+      if (delBtn) {
+        delBtn.onclick = () => {
+          const p = curProvider()
+          if (providers.length <= 1) { self.ui.showError('至少保留一个服务商'); return }
+          if (!confirm(`确定删除「${p.name}」？`)) return
+          const idx = providers.findIndex(x => x.id === currentAid)
+          providers.splice(idx, 1)
+          switchTo(providers[0].id)
+        }
+      }
+      // 获取模型
+      const fetchBtn = getFetchBtn()
+      if (fetchBtn) {
+        fetchBtn.onclick = async () => {
+          const urlInput = getUrlInput()
+          const keyInput = getKeyInput()
+          const modelSelect = getModelSelect()
+          const statusEl = getStatusEl()
+          const baseUrl = urlInput?.value?.trim()
+          const apiKey = keyInput?.value?.trim()
+
+          if (!baseUrl) { self.ui.showError('请填写API地址'); return }
+          if (!apiKey) { self.ui.showError('请填写API Key'); return }
+
+          statusEl.textContent = '⏳ 正在获取模型列表...'
+          fetchBtn.disabled = true
+          modelSelect.disabled = true
+
+          try {
+            const modelsUrl = baseUrl.replace(/\/chat\/completions$/, '/models')
+            const res = await fetch(modelsUrl, {
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const data = await res.json()
+            const models = data.data || []
+            if (!models.length) throw new Error('返回的模型列表为空')
+
+            const cur = curProvider()
+            cur.models = models.map(m => ({ id: m.id, owned_by: m.owned_by }))
+            if (!cur.selectedModel && models.length) cur.selectedModel = models[0].id
+            renderDetail()
+            statusEl.innerHTML = `<span style="color:#4CAF50;">✅ 获取到 ${models.length} 个模型</span>`
+          } catch (e) {
+            statusEl.innerHTML = `<span style="color:#f44336;">❌ 获取失败: ${e.message}</span>`
+            modelSelect.disabled = true
+          } finally {
+            fetchBtn.disabled = false
+          }
+        }
+      }
+    }
+
+    // 显示弹窗
+    this.ui.dialog.show({
+      title: '服务商 & 模型管理',
+      content: [
+        { type: 'html', html: '<div id="quickCfgTabs" style="margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:center;"></div>' },
+        { type: 'html', html: '<div id="quickCfgStatus" style="color:#E9C000;font-size:12px;min-height:18px;margin-bottom:4px;"></div>' },
+        { type: 'text', name: 'apiUrl', label: 'API地址 (chat/completions)', value: '', placeholder: 'https://api.deepseek.com/v1/chat/completions' },
+        { type: 'text', name: 'apiKey', label: 'API Key', value: '', placeholder: 'sk-...' },
+        { type: 'html', html: '<div style="text-align:right;margin:6px 0;"><button type="button" id="quickCfgFetchBtn" style="background:#E9C000;color:#1a1a2e;border:none;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px;">📡 获取模型列表</button></div>' },
+        { type: 'html', html: '<label style="display:block;margin-bottom:4px;font-size:13px;color:#B0C0C0;">模型</label>' },
+        { type: 'html', html: '<select id="quickCfgModel" style="width:100%;padding:8px;background:#333;color:#fff;border:1px solid #555;border-radius:4px;font-size:13px;" disabled><option>请先获取模型列表</option></select>' },
+        { type: 'html', html: '<input type="hidden" id="quickCfgActiveId" value="' + currentAid + '">' },
+      ],
+      buttons: [
+        { text: '删除', type: 'danger', id: 'quickCfgDelBtn', onClick: () => {} },  // 由 bindEvents 接管
+        { text: '取消', type: 'default', onClick: () => this.ui.dialog.close() },
+        { text: '保存', type: 'primary', submit: true }
+      ],
+      onSubmit: (formData) => {
+        // 把当前表单值写回 providers
+        const p = curProvider()
+        if (p) {
+          p.apiUrl = formData.apiUrl
+          p.apiKey = formData.apiKey
+        }
+        // 获取选中模型
+        const modelSelect = getModelSelect()
+        const selectedModel = modelSelect?.value
+        if (selectedModel && selectedModel !== '请先获取模型列表') {
+          if (p) p.selectedModel = selectedModel
+        }
+        // 保存到 configManager
+        this._saveProviders(providers)
+        this.configManager.set('activeProviderId', currentAid)
+        // 同步 apiClient
+        const active = curProvider()
+        this.api.setApiKey(active.apiKey)
+        this.api.setApiUrl(active.apiUrl)
+        this.ui.dialog.close()
+        this.ui.showSuccess(`已切换到「${active.name}」`)
+      },
+      onOpen: () => {
+        renderAll()
+        // 删除按钮特殊处理（DialogManager 的 submit 机制会让 type=button 也触发表单事件，需要 clone 覆盖）
+        const delBtn = getDelBtn()
+        if (delBtn) {
+          const newBtn = delBtn.cloneNode(true)
+          delBtn.parentNode.replaceChild(newBtn, delBtn)
+        }
+      }
+    })
   }
   // 打开快捷回复面板
   async openQuickReplyPanel() {

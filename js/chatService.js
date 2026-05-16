@@ -8,13 +8,15 @@ class Messages {
   constructor() {
     this.messages = []
     this.systems = []
+    this.tools = []
     this.hintData = {
       name: '',
-      toolState: {
-        currentTime: '同步失败', // 当前时间
-        currentTime_TS: 0, // 当前时间戳
-      }
+      
     }
+    // 思维链提示词
+    this.fakeToolCalls = []
+    // 推理模式开关（全局，影响所有思维链提示词注入方式）
+    this.useReasoning = true
   }
 
   //Mpush方法，修改messages数组，推送新消息
@@ -56,6 +58,198 @@ class Messages {
     //return用于返回push的返回值数组长度，如果后面要接着新代码，可以直接更改为返回数组长度。
     return this.systems.push({ role: 'system', content, open })
   }
+  // ===== 伪造工具调用链管理 =====
+  // 推入一条伪造工具调用
+  FakeTCpush({ toolName = 'think', thinking = '', toolResult = 'OK', note = '', open = true } = {}) {
+    const id = 'ftc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)
+    return this.fakeToolCalls.push({ id, open, toolName, thinking, toolResult, note })
+  }
+  // 切换开关
+  toggleFakeTCOpen(index) {
+    if (index < 0 || index >= this.fakeToolCalls.length) throw new Error(`无效的伪造工具调用索引: ${index}`)
+    this.fakeToolCalls[index].open = !this.fakeToolCalls[index].open
+  }
+  // 修改指定条
+  setFakeTC(index, updates) {
+    if (index < 0 || index >= this.fakeToolCalls.length) throw new Error(`无效的伪造工具调用索引: ${index}`)
+    Object.assign(this.fakeToolCalls[index], updates)
+  }
+  // 删除指定条
+  deleteFakeTC(index) {
+    if (index < 0 || index >= this.fakeToolCalls.length) throw new Error(`无效的伪造工具调用索引: ${index}`)
+    this.fakeToolCalls.splice(index, 1)
+  }
+  // 上移 / 下移
+  moveFakeTC(index, direction) {
+    if (index < 0 || index >= this.fakeToolCalls.length) throw new Error(`无效的伪造工具调用索引: ${index}`)
+    const target = index + (direction === 'up' ? -1 : 1)
+    if (target < 0 || target >= this.fakeToolCalls.length) return
+    const tmp = this.fakeToolCalls[index]
+    this.fakeToolCalls[index] = this.fakeToolCalls[target]
+    this.fakeToolCalls[target] = tmp
+  }
+  // 获取开启的伪造工具调用
+  getOpenFakeTCs() {
+    return this.fakeToolCalls.filter(item => item?.open !== false)
+  }
+  // 切换全局推理模式
+  toggleReasoning() {
+    this.useReasoning = !this.useReasoning
+    return this.useReasoning
+  }
+  //parameters的构造方法，辅助构造工具信息
+  constructParameters(array) {
+    // 参数可以是数组或对象，统一转换为数组处理
+    let paramsArray = [];
+    
+    if (Array.isArray(array)) {
+      paramsArray = array;
+    } else if (typeof array === 'object' && array !== null) {
+      // 单个参数对象转为数组
+      paramsArray = [array];
+    } else {
+      throw new Error(`
+        [系统提示异常] 检测到无效的参数格式
+        原因: 参数必须是数组或对象
+        代码: INVALID_PARAMETERS_FORMAT
+        建议: 传入格式为 {name, type, description} 的对象或该对象的数组
+      `);
+    }
+    
+    // 验证并转换参数格式
+    const parameters = {};
+    
+    for (let i = 0; i < paramsArray.length; i++) {
+      const param = paramsArray[i];
+      
+      // 验证必要字段
+      if (!param?.name?.trim()) {
+        throw new Error(`
+          [系统提示异常] 检测到空参数名称
+          位置: 第 ${i + 1} 个参数
+        `);
+      }
+      
+      if (!param?.type?.trim()) {
+        throw new Error(`
+          [系统提示异常] 检测到空参数类型
+          位置: 参数 "${param.name}"
+        `);
+      }
+      
+      if (!param?.description?.trim()) {
+        throw new Error(`
+          [系统提示异常] 检测到空参数描述
+          位置: 参数 "${param.name}"
+        `);
+      }
+      
+      // 转换为OpenAI工具参数格式
+      parameters[param.name] = {
+        type: param.type,
+        description: param.description
+      };
+    }
+    
+    return {
+      type: 'object',
+      properties: parameters,
+      required: Object.keys(parameters)
+    };
+  }
+  //Messages的tool构造方法，可以帮助我们构造工具信息
+  constructTool({ name, description, parameters }) {
+    if (!name?.trim()) {
+      throw new Error(`
+        [系统提示异常] 检测到空工具名称
+    `)
+    }
+    if (!description?.trim()) {
+      throw new Error(`
+        [系统提示异常] 检测到空工具描述
+    `)
+    }
+    
+    // 验证参数格式，使用constructParameters方法统一处理
+    let processedParameters;
+    try {
+      processedParameters = this.constructParameters(parameters);
+    } catch (error) {
+      throw new Error(`
+        [系统提示异常] 工具参数验证失败
+        工具名称: ${name}
+        错误详情: ${error.message}
+      `);
+    }
+    
+    // 返回OpenAI工具格式
+    return {
+      type: 'function',
+      function: {
+        name,
+        description,
+        parameters: processedParameters
+      }
+    };
+  }
+
+  // 工具数组的推送方法
+  Tpush(tool) {
+    // 支持直接传入构造好的工具对象
+    if (typeof tool === 'object' && tool !== null) {
+      // 验证工具格式
+      if (!tool.type || tool.type !== 'function') {
+        throw new Error(`
+          [系统提示异常] 检测到无效的工具类型
+          期望: 'function'
+          实际: '${tool.type || 'undefined'}'
+        `);
+      }
+      
+      if (!tool.function?.name?.trim()) {
+        throw new Error(`
+          [系统提示异常] 检测到空工具名称
+        `);
+      }
+      
+      return this.tools.push(tool);
+    }
+    
+    // 也支持传入constructTool的参数格式
+    if (tool.name && tool.description && tool.parameters) {
+      const constructedTool = this.constructTool(tool);
+      return this.tools.push(constructedTool);
+    }
+    
+    throw new Error(`
+      [系统提示异常] 检测到无效的工具格式
+      支持格式:
+        1. 构造好的工具对象 {type: 'function', function: {...}}
+        2. 工具参数对象 {name, description, parameters}
+    `);
+  }
+
+  // 三合一方法：构造工具并推送到工具数组
+  Toolpush(name, description, parameters) {
+    if (!name?.trim()) {
+      throw new Error(`
+        [系统提示异常] 检测到空工具名称
+      `);
+    }
+    
+    if (!description?.trim()) {
+      throw new Error(`
+        [系统提示异常] 检测到空工具描述
+      `);
+    }
+    
+    // 使用constructTool构造工具
+    const tool = this.constructTool({ name, description, parameters });
+    
+    // 推送到工具数组
+    return this.tools.push(tool);
+  }
+  
 
   //messages数组的撤回方法，撤回到指定索引之上的assistant消息
   Mundo(index) {
@@ -158,18 +352,6 @@ class Messages {
     return this.systems.filter(item => item?.open !== false)
   }
 
-  // 获取 hintData 生成的系统提示对象
-  getHintSystem() {
-    const { currentTime } = Utils.updateCurrentTime(this.hintData?.toolState) // 自动更新时间
-    return {
-      role: 'system',
-      content: `
-    你的名字||标题是：${this.hintData.name || '未知'}，现实实时 时间：${currentTime}，时间戳：废弃
-    `,
-      open: true
-    }
-  }
-
   // 获取最近 N - 周期 轮消息（每轮2条，用户+AI），baseRounds 为基础轮数，cycleRounds 为周期轮数
   getRecentMessages(baseRounds, cycleRounds) {
     // 1. 格式化消息（保留role和content）
@@ -205,18 +387,61 @@ class Messages {
     return messages.slice(n);
   }
 
-  // 获取所有消息（系统提示+hint+用户消息）
+  // 获取所有消息（系统提示 + 对话记录 + 伪造工具调用链）
   getMessages(baseRounds, cycleRounds) {
-    // 先获取开启的系统提示
+    // 1. 系统提示
     const systems = this.getOpenSystems()
-    // 加入 hintData
-    systems.unshift(this.getHintSystem())
-    // 获取消息片段
+    // 2. 对话记录
     const messages = this.getRecentMessages(baseRounds, cycleRounds)
-    // 合并返回
+    // 3. 伪造工具调用链（放在消息之后，模型会在回复前"看到"这些调用）
+    const fakeMsgs = []
+    const openFakes = this.getOpenFakeTCs()
+    let callIdx = 0
+    openFakes.forEach(tc => {
+      callIdx++
+      const callId = `fake_tc_${callIdx}`
+      const thinking = tc.thinking || ''
+      const result = tc.toolResult || 'OK'
+      if (this.useReasoning) {
+        // 推理模型：reasoning_content + tool_calls + tool 返回
+        fakeMsgs.push({
+          role: 'assistant',
+          content: null,
+          reasoning_content: thinking,
+          tool_calls: [{
+            id: callId,
+            type: 'function',
+            function: { name: tc.toolName, arguments: '{}' }
+          }]
+        })
+        fakeMsgs.push({
+          role: 'tool',
+          tool_call_id: callId,
+          content: result
+        })
+      } else {
+        // 普通模型：content + tool_calls + tool 返回
+        fakeMsgs.push({
+          role: 'assistant',
+          content: thinking,
+          tool_calls: [{
+            id: callId,
+            type: 'function',
+            function: { name: tc.toolName, arguments: '{}' }
+          }]
+        })
+        fakeMsgs.push({
+          role: 'tool',
+          tool_call_id: callId,
+          content: result
+        })
+      }
+    })
+    // 合并返回：system → 对话 → 伪造工具调用链
     return [
       ...systems,
-      ...messages
+      ...messages,
+      ...fakeMsgs
     ]
   }
 
@@ -227,13 +452,13 @@ class Messages {
     return {
       // 版本号
       __format_version: 1,
-      // 时间戳
-      exportedAt: new Date().toISOString(),
       // 有效载荷
       payload: {
         messages: JSON.parse(JSON.stringify(this.messages)),
         systems: JSON.parse(JSON.stringify(this.systems)),
         hintData: JSON.parse(JSON.stringify(this.hintData)),
+        fakeToolCalls: JSON.parse(JSON.stringify(this.fakeToolCalls)),
+        useReasoning: this.useReasoning,
       }
     }
   }
@@ -248,6 +473,9 @@ class Messages {
     this.messages = parsed.messages
     this.systems = parsed.systems
     this.hintData = parsed.hintData
+    this.fakeToolCalls = parsed.fakeToolCalls || []
+    this.tools = parsed.tools || []
+    this.useReasoning = parsed.useReasoning !== false
   }
 
   // 3. 兼容老格式的解析/转换辅助函数（静态）
@@ -257,7 +485,8 @@ class Messages {
       return {
         messages: obj.payload.messages || [],
         systems: obj.payload.systems || [],
-        hintData: obj.payload.hintData || { name: '', toolState: { currentTime: '同步失败', currentTime_TS: 0 } }
+        hintData: obj.payload.hintData || { name: '' },
+        fakeToolCalls: obj.payload.fakeToolCalls || [],
       }
     }
     throw new Error('无法识别的聊天数据格式')
@@ -459,5 +688,34 @@ class ApiClient {
     } else {
       throw new Error('无效的请求体类型，应传入对象或JSON字符串');
     }
+  }
+
+  // 兼容老格式的解析/转换辅助函数（静态）
+  static parseCompatible(obj) {
+    // 新格式
+    if (obj?.__format_version === 1 && obj.payload) {
+      return {
+        messages: obj.payload.messages || [],
+        systems: obj.payload.systems || [],
+        hintData: obj.payload.hintData || { name: '' },
+        tools: obj.payload.tools || [],
+        fakeToolCalls: obj.payload.fakeToolCalls || [],
+        useReasoning: obj.payload.useReasoning !== false,
+      }
+    }
+    
+    // 旧格式（没有版本号）
+    if (obj?.messages && Array.isArray(obj.messages)) {
+      return {
+        messages: obj.messages || [],
+        systems: obj.systems || [],
+        hintData: obj.hintData || { name: '' },
+        tools: obj.tools || [],
+        fakeToolCalls: obj.fakeToolCalls || [],
+        useReasoning: obj.useReasoning !== false,
+      }
+    }
+    
+    throw new Error('无法识别的聊天数据格式')
   }
 }
