@@ -389,6 +389,10 @@ button {
   transition: all .2s;
 }
 
+.list .cot-placeholder .cot-block .cot-content {
+    white-space: pre-wrap;
+}
+
 .list .cot-placeholder[data-collapse="true"] .cot-block .cot-content {
   max-height: 5000px;
   /* 设为足够大即可 */
